@@ -14,19 +14,11 @@ const calculateApngLength = (apngFile) => {
       d[i + 2] === 0x54 &&
       d[i + 3] === 0x4c
     ) {
-      // numerator and denominator
-      const delayNum = Number(d[i + 23]);
-      const delayDen = Number(d[i + 25]);
-      let delay;
-      // minimum is 100ms
-      if (delayDen === 0) {
-        delay = delayNum / 100;
-      } else {
-        delay = delayNum / delayDen;
-      }
-      duration += delay;
+      const delayNum = (d[i + 24] << 8) | d[i + 25];
+      const delayDen = (d[i + 26] << 8) | d[i + 27];
+      duration += delayNum / (delayDen || 100);
     }
   }
-  return duration * 10;
+  return duration * 1000;
 };
 export default calculateApngLength;
