@@ -12,7 +12,11 @@ import { requestBuffer } from "../services/request";
  */
 
 const getAnimLength = async (url) => {
-  const extensions = [".gif", ".webp", ".apng"];
+  // Must match the image resolver's order (webp -> apng -> gif) so the
+  // duration is measured from the SAME file the viewport actually shows.
+  // The old order (gif first) measured a different file when a character
+  // shipped multiple formats, mistiming the preanim->talking swap.
+  const extensions = [".webp", ".apng", ".gif"];
   for (const extension of extensions) {
     const urlWithExtension = url + extension;
     const exists = await fileExists(urlWithExtension);
