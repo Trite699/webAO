@@ -5,12 +5,26 @@ interface ParsedIni {
 
 const regexPatterns = {
   section: /^\s*\[\s*([^\]]*)\s*\]\s*$/,
-  param: /^\s*([\w.\-_]+)\s*=\s*(.*?)\s*$/,
+  // Keys may contain / and \ : some char.inis write per-frame effects in a
+  // flattened QSettings form, e.g. "[anim]" with keys like
+  // "Rap_FrameSFX\15" or "wit_bulky/Rap_FrameSFX\12" (Rimes). Without
+  // these characters allowed, those lines were silently dropped.
+  param: /^\s*([\w.\-_/\\]+)\s*=\s*(.*?)\s*$/,
   comment: /^\s*;.*$/,
 };
 
 const valueHandler = (matchKey: string, matchValue: string): string => {
-  return matchKey === "showname" ? matchValue : matchValue.toLowerCase();
+  // Preserve original case for shownames and for shout names/messages
+  // ([Shouts] keys like Custom_Message), so the IC log can show e.g.
+  // "Apollo shouts GOTCHA!" with the author's casing.
+  if (
+    matchKey === "showname" ||
+    matchKey.endsWith("_message") ||
+    matchKey.endsWith("_name")
+  ) {
+    return matchValue;
+  }
+  return matchValue.toLowerCase();
 };
 
 const lineFilter = (value: string): boolean => {
