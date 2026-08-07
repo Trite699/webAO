@@ -2,6 +2,7 @@ import { prepChat } from "../../encoding";
 import { client } from "../../client";
 import { AO_HOST } from "../../client/aoHost";
 import { appendICLog } from "../../client/appendICLog";
+import { fadeToTrack } from "../../client/musicFade";
 
 /**
  * Handles a music change to an arbitrary resource.
@@ -13,19 +14,15 @@ export const handleMC = (args: string[]) => {
   const showname = args[3] || "";
   const looping = Boolean(Number(args[4])) || false;
   const channel = Number(args[5]) || 0;
-  // const fading = Number(args[6]) || 0; // unused in web
+  // const fading = Number(args[6]) || 0; // server-side fade flag, unused: we always fade unless the client toggle is off
 
-  const music = client.viewport.music[channel];
+  const src = track.startsWith("http")
+    ? track
+    : `${AO_HOST}sounds/music/${encodeURI(track.toLowerCase())}`;
+  const targetVol = client.viewport.music[channel]?.volume ?? 0.5;
+  fadeToTrack(client.viewport.music, channel, src, looping, targetVol);
+
   let musicname;
-  music.pause();
-  if (track.startsWith("http")) {
-    music.src = track;
-  } else {
-    music.src = `${AO_HOST}sounds/music/${encodeURI(track.toLowerCase())}`;
-  }
-  music.loop = looping;
-  music.play().catch(() => {});
-
   try {
     musicname = client.chars[charID].name;
   } catch (e) {
