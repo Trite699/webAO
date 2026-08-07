@@ -35,9 +35,9 @@
 }
 
 #client_chatcontainer {
-  position: absolute;
+  position: center;
   bottom: 0;
-  height: 27%;
+  height: 100%;
   width: 100%;
   font-family: sans-serif;
   background-image: url("dd.svg");
