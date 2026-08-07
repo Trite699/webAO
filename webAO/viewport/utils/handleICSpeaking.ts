@@ -12,6 +12,7 @@ import { COLORS } from "../constants/colors";
 import mlConfig from "../../utils/aoml";
 import request from "../../services/request";
 import preloadMessageAssets from "./preloadMessageAssets";
+import { getShoutLogText } from "./getShoutLogText";
 
 let attorneyMarkdown: ReturnType<typeof mlConfig> | null = null;
 export let markdownDisabled = false;
@@ -131,8 +132,14 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
 
   client.viewport.setLastCharacter(client.viewport.getChatmsg().name);
 
+  const shoutLogText = getShoutLogText(client.viewport.getChatmsg());
+  const icLogText =
+    client.viewport.getChatmsg().content.trim() === "" && shoutLogText
+      ? shoutLogText
+      : client.viewport.getChatmsg().content;
+
   appendICLog(
-    client.viewport.getChatmsg().content,
+    icLogText,
     client.viewport.getChatmsg().showname,
     client.viewport.getChatmsg().nameplate,
   );
