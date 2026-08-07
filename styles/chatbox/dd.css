@@ -48,12 +48,12 @@
 #client_name {
   display: flex;
   align-items: center;
-  padding: 0 0 0 2%;
-  height: 6.2%;
-  width: 19.6%;
-  position: absolute !important;
-  top: 73.2% !important;
-  left: 16.7% !important;
+  padding: 0 0 0 3%;
+  height: 4.6%;
+  width: 16.8%;
+  position: absolute;
+  top: 56.7%;
+  left: 12%;
   box-sizing: border-box;
 }
 
@@ -66,11 +66,11 @@
 #client_chat {
   font-size: 1em;
   display: block;
-  width: 63.7%;
-  height: 15.5%;
-  position: absolute !important;
-  top: 80.4% !important;
-  left: 17.1% !important;
+  width: 48%;
+  height: 13.4%;
+  position: absolute;
+  top: 61.6%;
+  left: 12.8%;
   word-break: keep-all;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -81,7 +81,7 @@
 }
 
 #client_inner_chat {
-  padding: 0.5% 1.5%;
+  padding: 1% 2%;
   margin: 0;
 }
 
