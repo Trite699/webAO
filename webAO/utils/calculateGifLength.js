@@ -11,12 +11,17 @@ const calculateGifLength = (gifFile) => {
   // And http://www.w3.org/Graphics/GIF/spec-gif89a.txt
   let duration = 0;
   for (let i = 0; i < d.length; i++) {
-    // Find a Graphic Control Extension hex(21F904__ ____ __00)
+    // Find a Graphic Control Extension hex(21F904__ ____ __00) that is
+    // actually followed by an Image Descriptor (0x2C). The trailing-block
+    // check avoids matching the same byte pattern inside compressed image
+    // data, which over-counted frames and over-estimated the duration --
+    // making looping preanims replay their start before switching to talk.
     if (
       d[i] === 0x21 &&
       d[i + 1] === 0xf9 &&
       d[i + 2] === 0x04 &&
-      d[i + 7] === 0x00
+      d[i + 7] === 0x00 &&
+      d[i + 8] === 0x2c
     ) {
       // Swap 5th and 6th bytes to get the delay per frame
       const delay = (d[i + 5] << 8) | (d[i + 4] & 0xff);
