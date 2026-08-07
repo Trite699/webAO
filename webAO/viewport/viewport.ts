@@ -4,6 +4,11 @@ import { client, delay } from "../client";
 import { UPDATE_INTERVAL } from "../client";
 import setEmote from "../client/setEmote";
 import setEmoteFromUrl from "../client/setEmoteFromUrl";
+import { startFramePhase, FRAME_PHASE, stopFrameEffects } from "./utils/frameEffects";
+
+// AO2 multiplies char.ini time values (e.g. the SoundT sfx delay) by this
+// constant to convert them to milliseconds (courtroom.h: time_mod = 40).
+const SFX_TIME_MOD = 40;
 import { AO_HOST } from "../client/aoHost";
 import { Viewport } from "./interfaces/Viewport";
 import { createBlipsChannels } from "./utils/createBlipChannels";
@@ -42,6 +47,11 @@ const viewport = (): Viewport => {
   let theme: string;
   let tickTimer = 0;
   let updater: any;
+  // Real wall-clock time (performance.now) when the preanim/message visuals
+  // started. Used to time the preanim->talking swap by REAL elapsed time
+  // rather than the tick counter, which drifts behind real time when the
+  // event loop is busy -- the cause of the inconsistent preanim flash.
+  let realStart = 0;
   let backgroundName = "";
   const getSfxAudio = () => sfxAudio;
   const setSfxAudio = (value: HTMLAudioElement) => {
@@ -143,6 +153,41 @@ const viewport = (): Viewport => {
     document.getElementById("client_testimony").style.opacity = "0";
     clearTimeout(testimonyUpdater);
   };
+  // Text-reveal command handlers. These are message-invariant, so they're
+  // defined ONCE here instead of being re-allocated on every character tick.
+  // The old per-character allocation (a fresh Map + three async closures + a
+  // Set for every letter) was invisible on desktop but added real GC/CPU
+  // pressure on weaker mobile devices, which -- because blips are emitted
+  // one-per-character-tick -- slowed the text AND the blips together.
+  const tickFlash = async () => {
+    const effectlayer = document.getElementById("client_flash");
+    const realizationUrl =
+      chatmsg.preloadedAssets?.realizationSfxUrl ??
+      `${AO_HOST}sounds/general/sfx-realization.opus`;
+    playSFX(realizationUrl, false);
+    effectlayer.style.animation = "flash 0.4s 1";
+    await delay(400);
+    effectlayer.style.removeProperty("animation");
+  };
+  const tickShake = async () => {
+    const gamewindow = document.getElementById("client_gamewindow");
+    const stabUrl =
+      chatmsg.preloadedAssets?.stabSfxUrl ??
+      `${AO_HOST}sounds/general/sfx-stab.opus`;
+    playSFX(stabUrl, false);
+    gamewindow.style.animation = "shake 0.2s 1";
+    await delay(200);
+    gamewindow.style.removeProperty("animation");
+  };
+  const tickPause = async (digits?: string) => {
+    const multiplier = !digits || digits === "" ? 1 : parseInt(digits, 10) || 1;
+    await delay(multiplier * 100);
+  };
+  const tickCommands = new Map<string, (digits?: string) => Promise<void>>(
+    Object.entries({ s: tickShake, f: tickFlash, p: tickPause }),
+  );
+  const textSpeedChars = new Set(["{", "}"]);
+
   const handleTextTick = async (charLayers: HTMLImageElement) => {
     const chatBox = document.getElementById("client_chat");
     const waitingBox = document.getElementById("client_chatwaiting");
@@ -161,43 +206,9 @@ const viewport = (): Viewport => {
       const COMMAND_IDENTIFIER = "\\";
 
       const nextCharacterElement = chatmsg.parsed[textnow.length];
-      const flash = async () => {
-        const effectlayer = document.getElementById("client_fg");
-        const realizationUrl = chatmsg.preloadedAssets?.realizationSfxUrl
-          ?? `${AO_HOST}sounds/general/sfx-realization.opus`;
-        playSFX(realizationUrl, false);
-        effectlayer.style.animation = "flash 0.4s 1";
-        await delay(400);
-        effectlayer.style.removeProperty("animation");
-      };
-
-      const shake = async () => {
-        const gamewindow = document.getElementById("client_gamewindow");
-        const stabUrl = chatmsg.preloadedAssets?.stabSfxUrl
-          ?? `${AO_HOST}sounds/general/sfx-stab.opus`;
-        playSFX(stabUrl, false);
-        gamewindow.style.animation = "shake 0.2s 1";
-        await delay(200);
-        gamewindow.style.removeProperty("animation");
-      };
-
-      const pause = async (digits?: string) => {
-        // Default to 100ms if no number specified
-        const multiplier = !digits || digits === "" ? 1 : parseInt(digits, 10) || 1;
-        await delay(multiplier * 100);
-      };
-
-      const commands = new Map(
-        Object.entries({
-          s: shake,
-          f: flash,
-          p: pause,
-        }),
-      );
-      const textSpeeds = new Set(["{", "}"]);
 
       // Changing Text Speed
-      if (textSpeeds.has(characterElement.innerHTML)) {
+      if (textSpeedChars.has(characterElement.innerHTML)) {
         // Grab them all in a row
         const MAX_SLOW_CHATSPEED = 120;
         for (let i = textnow.length; i < chatmsg.content.length; i++) {
@@ -220,7 +231,7 @@ const viewport = (): Viewport => {
 
       if (
         characterElement.innerHTML === COMMAND_IDENTIFIER &&
-        (commands.has(nextCharacterElement?.innerHTML) ||
+        (tickCommands.has(nextCharacterElement?.innerHTML) ||
           nextCharacterElement?.innerHTML === "p")
       ) {
         textnow = chatmsg.content.substring(0, textnow.length + 1);
@@ -239,9 +250,9 @@ const viewport = (): Viewport => {
             textnow = chatmsg.content.substring(0, startPos + offset);
             offset++;
           }
-          await pause(digits);
+          await tickPause(digits);
         } else {
-          await commands.get(commandChar)();
+          await tickCommands.get(commandChar)();
         }
       } else {
         chatBoxInner.appendChild(chatmsg.parsed[textnow.length - 1]);
@@ -259,6 +270,8 @@ const viewport = (): Viewport => {
       }
       charLayers.style.opacity = "1";
       waitingBox.style.opacity = "1";
+      stopFrameEffects(); // message ended -- cancel any pending frame SFX
+      if (chatmsg.preloadedAssets) startFramePhase(FRAME_PHASE.idle, chatmsg.preloadedAssets.idleUrl, chatmsg, true); // idle-sprite frame SFX (loops until next message)
       clearTimeout(updater);
     }
   };
@@ -327,9 +340,26 @@ const viewport = (): Viewport => {
 
     // TODO: preanims sometimes play when they're not supposed to
     const isShoutOver = tickTimer >= shoutTimer;
+    // Switch to the talking sprite slightly BEFORE the preanim's measured
+    // end. AA preanims are usually saved as infinitely-looping animations;
+    // the browser honors that and wraps an <img> back to frame 0, so if we
+    // waited for the exact end (then up to one ~60ms tick) the preanim's
+    // first frame flashed before the talking sprite appeared. The lead must
+    // exceed the tick granularity to reliably beat the loop; it's capped so
+    // short preanims aren't skipped, and the talking sprite is a seamless
+    // continuation of the scene so the trimmed tail isn't noticeable.
+    const talkingLead = Math.min(
+      UPDATE_INTERVAL * 2,
+      chatmsg.preanimdelay * 0.4,
+    );
     const isShoutAndPreanimOver =
-      tickTimer >= shoutTimer + chatmsg.preanimdelay;
+      !startFirstTickCheck &&
+      realStart > 0 &&
+      performance.now() - realStart >= chatmsg.preanimdelay - talkingLead;
     if (isShoutOver && startFirstTickCheck) {
+      // Mark the real wall-clock start of the visuals so the talking swap is
+      // timed against real time (immune to tick drift).
+      realStart = performance.now();
       // Effect stuff
       if (chatmsg.screenshake === 1) {
         // Shake screen
@@ -343,15 +373,25 @@ const viewport = (): Viewport => {
         const realizationUrl = chatmsg.preloadedAssets?.realizationSfxUrl
           ?? `${AO_HOST}sounds/general/sfx-realization.opus`;
         playSFX(realizationUrl, false);
-        effectlayer.style.animation = "flash 0.4s 1";
+        const flashlayer = document.getElementById("client_flash");
+        if (flashlayer) {
+          flashlayer.style.animation = "flash 0.4s 1";
+          setTimeout(() => flashlayer.style.removeProperty("animation"), 400);
+        }
       }
+
+      // Hide the shout splash now that the shout is over -- ALWAYS, not
+      // only when there's a preanim. In immediate mode a shout+no-preanim
+      // message used to leave the splash stuck on screen because this was
+      // gated behind preanimdelay > 0.
+      shoutSprite.style.display = "none";
+      shoutSprite.style.animation = "";
 
       // Pre-animation stuff
       if (chatmsg.preanimdelay > 0) {
-        shoutSprite.style.display = "none";
-        shoutSprite.style.animation = "";
         if (chatmsg.preloadedAssets) {
           setEmoteFromUrl(chatmsg.preloadedAssets.preanimUrl, false, chatmsg.side);
+          startFramePhase(FRAME_PHASE.preanim, chatmsg.preloadedAssets.preanimUrl, chatmsg);
         } else {
           const preanim = chatmsg.preanim.toLowerCase();
           setEmote(AO_HOST, client, charName, preanim, "", false, chatmsg.side);
@@ -373,10 +413,43 @@ const viewport = (): Viewport => {
     }
 
     const hasNonInterruptingPreAnim = chatmsg.noninterrupting_preanim === 1;
-    if (textnow !== chatmsg.content && hasNonInterruptingPreAnim) {
+    if (hasNonInterruptingPreAnim && isShoutOver) {
       const chatContainerBox = document.getElementById("client_chatcontainer");
-      chatContainerBox.style.opacity = "1";
-      await handleTextTick(charLayers);
+      const preanimPlaying =
+        chatmsg.preanimdelay > 0 &&
+        tickTimer < shoutTimer + chatmsg.preanimdelay;
+      if (textnow !== chatmsg.content) {
+        chatContainerBox.style.opacity = "1";
+        if (!preanimPlaying) {
+          if (chatmsg.preloadedAssets) {
+            setEmoteFromUrl(chatmsg.preloadedAssets.talkingUrl, false, chatmsg.side);
+            startFramePhase(FRAME_PHASE.talking, chatmsg.preloadedAssets.talkingUrl, chatmsg, true);
+          } else {
+            setEmote(AO_HOST, client, charName, charEmote, "(b)", false, chatmsg.side);
+          }
+        }
+        charLayers.style.opacity = "1";
+        await handleTextTick(charLayers);
+      } else if (preanimPlaying) {
+        // Text is fully revealed but the preanim hasn't finished -- keep it
+        // on screen and let the loop continue rather than cutting to idle,
+        // which made longer preanims look sped up / clipped in immediate.
+        charLayers.style.opacity = "1";
+      } else {
+        // Both text and preanim done: settle to idle and finish.
+        if (chatmsg.preloadedAssets) {
+          setEmoteFromUrl(chatmsg.preloadedAssets.idleUrl, false, chatmsg.side);
+        } else {
+          setEmote(AO_HOST, client, charName, charEmote, "(a)", false, chatmsg.side);
+        }
+        charLayers.style.opacity = "1";
+        waitingBox.style.opacity = "1";
+        animating = false;
+        stopFrameEffects(); // message ended -- cancel any pending frame SFX
+        if (chatmsg.preloadedAssets) startFramePhase(FRAME_PHASE.idle, chatmsg.preloadedAssets.idleUrl, chatmsg, true); // idle-sprite frame SFX (loops until next message)
+          clearTimeout(updater);
+        return;
+      }
     } else if (isShoutAndPreanimOver && startSecondTickCheck) {
       if (chatmsg.startspeaking) {
         chatmsg.startspeaking = false;
@@ -453,12 +526,34 @@ const viewport = (): Viewport => {
 
         if (chatmsg.preloadedAssets) {
           setEmoteFromUrl(chatmsg.preloadedAssets.talkingUrl, false, chatmsg.side);
+          startFramePhase(FRAME_PHASE.talking, chatmsg.preloadedAssets.talkingUrl, chatmsg, true);
         } else {
           setEmote(AO_HOST, client, charName, charEmote, "(b)", false, chatmsg.side);
         }
         charLayers.style.opacity = "1";
 
         if (textnow === chatmsg.content) {
+          // Fire the emote SFX if it hasn't already. This covers blankposts
+          // and very short messages whose tick ends here before the SFX
+          // delay would elapse in the check below (e.g. Narrator's dink).
+          // AO2 plays these via an independent timer.
+          if (
+            !sfxplayed &&
+            chatmsg.sound !== "0" &&
+            chatmsg.sound !== "1" &&
+            chatmsg.sound !== "" &&
+            chatmsg.sound !== undefined &&
+            (chatmsg.type == 1 ||
+              chatmsg.type == 2 ||
+              chatmsg.type == 5 ||
+              chatmsg.type == 6)
+          ) {
+            sfxplayed = 1;
+            const sfxUrl =
+              chatmsg.preloadedAssets?.emoteSfxUrl ??
+              `${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`;
+            playSFX(sfxUrl, chatmsg.looping_sfx);
+          }
           if (chatmsg.preloadedAssets) {
             setEmoteFromUrl(chatmsg.preloadedAssets.idleUrl, false, chatmsg.side);
           } else {
@@ -467,7 +562,9 @@ const viewport = (): Viewport => {
           charLayers.style.opacity = "1";
           waitingBox.style.opacity = "1";
           animating = false;
-          clearTimeout(updater);
+          stopFrameEffects(); // message ended -- cancel any pending frame SFX
+          if (chatmsg.preloadedAssets) startFramePhase(FRAME_PHASE.idle, chatmsg.preloadedAssets.idleUrl, chatmsg, true); // idle-sprite frame SFX (loops until next message)
+              clearTimeout(updater);
           return;
         }
       } else if (textnow !== chatmsg.content) {
@@ -479,14 +576,20 @@ const viewport = (): Viewport => {
       }
     }
 
-    if (!sfxplayed && chatmsg.snddelay + shoutTimer >= tickTimer) {
+    // Emote SFX (SoundN) fires after its delay (SoundT). AO2 multiplies the
+    // char.ini time value by time_mod (40) to get milliseconds, and fires
+    // when that much time has ELAPSED. The old condition was inverted
+    // (snddelay + shoutTimer >= tickTimer fired at tick 0) AND unscaled, so
+    // any character with a non-zero SoundT played its SFX immediately
+    // instead of after the delay.
+    if (!sfxplayed && tickTimer >= shoutTimer + chatmsg.snddelay * SFX_TIME_MOD) {
       sfxplayed = 1;
       if (
         chatmsg.sound !== "0" &&
         chatmsg.sound !== "1" &&
         chatmsg.sound !== "" &&
         chatmsg.sound !== undefined &&
-        (chatmsg.type == 1 || chatmsg.type == 2 || chatmsg.type == 6)
+        (chatmsg.type == 1 || chatmsg.type == 2 || chatmsg.type == 5 || chatmsg.type == 6)
       ) {
         const sfxUrl = chatmsg.preloadedAssets?.emoteSfxUrl
           ?? `${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`;
