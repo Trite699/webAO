@@ -40,8 +40,9 @@
   height: 27%;
   width: 100%;
   font-family: sans-serif;
-  background-image: url("dd.svg");
-  background-size: cover;
+  background-image: url("test.svg");
+  background-size: contain;
+  background-position: center center;
   background-repeat: no-repeat;
 }
 
