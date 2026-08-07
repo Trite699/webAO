@@ -19,6 +19,17 @@ export const setupCharacterBasic = (chargs: string[], charid: number) => {
       chargs[0].toLowerCase(),
     )}/char_icon${iconExt}`;
 
+    // Mirror into the AO2-style left list entry, if present.
+    const listIcon = <HTMLImageElement>(
+      document.getElementById(`charlist_icon_${charid}`)
+    );
+    const listName = document.getElementById(`charlist_name_${charid}`);
+    if (listIcon) {
+      listIcon.src = img.src;
+      listIcon.alt = chargs[0];
+    }
+    if (listName) listName.textContent = safeTags(chargs[0]);
+
     const mute_select = <HTMLSelectElement>(
       document.getElementById("mute_select")
     );
@@ -44,6 +55,8 @@ export const setupCharacterBasic = (chargs: string[], charid: number) => {
   } else {
     console.warn(`missing charid ${charid}`);
     img.style.display = "none";
+    const missingEntry = document.getElementById(`charlist_${charid}`);
+    if (missingEntry) missingEntry.style.display = "none";
   }
 };
 
@@ -134,5 +147,7 @@ export const handleCharacterInfo = async (chargs: string[], charid: number) => {
   } else {
     console.warn(`missing charid ${charid}`);
     img.style.display = "none";
+    const missingEntry = document.getElementById(`charlist_${charid}`);
+    if (missingEntry) missingEntry.style.display = "none";
   }
 };
