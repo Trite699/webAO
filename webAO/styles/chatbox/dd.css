@@ -40,10 +40,11 @@
   height: 27%;
   width: 100%;
   font-family: sans-serif;
-  background-image: url("test.svg");
+  background-image: url("dd.svg");
   background-size: 100% 100%;
   background-repeat: no-repeat;
 }
+
 #client_name {
   display: block;
   top: 0;
