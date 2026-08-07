@@ -34,4 +34,5 @@ export interface ChatMsg {
   looping_sfx?: boolean;
   noninterrupting_preanim?: number;
   preloadedAssets?: PreloadedAssets;
+  charid?: number;
 }
