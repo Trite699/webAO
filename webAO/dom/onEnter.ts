@@ -90,9 +90,9 @@ export function onEnter(event: KeyboardEvent) {
       noninterrupting_preanim,
       looping_sfx,
       screenshake,
-      "-",
-      "-",
-      "-",
+      myemo.frame_screenshake || "-",
+      myemo.frame_realization || "-",
+      myemo.frame_sfx || "-",
       additive,
       effect,
     );
