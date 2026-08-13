@@ -7,6 +7,8 @@ import { selectedShout, setSelectedShout } from "../client";
  */
 export function resetICParams() {
   (<HTMLInputElement>document.getElementById("client_inputbox")).value = "";
+  const typingIndicator = document.getElementById("client_typing_indicator");
+  if (typingIndicator) typingIndicator.textContent = "";
   document.getElementById("button_flash")!.className = "client_button";
   document.getElementById("button_shake")!.className = "client_button";
 
