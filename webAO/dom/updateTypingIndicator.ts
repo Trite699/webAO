@@ -1,34 +1,71 @@
 import { client } from "../client";
 
 /**
- * Shows "<Showname> is typing..." above the IC input box while it has
- * content, using the same name priority as an actual sent message: the
- * custom showname field (if the "showname" checkbox is on and it's
- * non-empty), otherwise the character's ini showname. Cleared once the
- * input box is emptied (typing stopped, or resetICParams ran after send).
+ * Wired to the IC input box's oninput. Tells OTHER players you're typing
+ * (piggybacked on CT — see client/sender/sendTR.ts), throttled so it's
+ * not a packet per keystroke:
+ *  - Leading edge (box goes non-empty): sends "typing" immediately.
+ *  - While it stays non-empty: re-sends "typing" every REFRESH_MS as a
+ *    keepalive, since the receiver auto-expires a typer after
+ *    TYPING_TIMEOUT_MS (typingState.ts) if it hears nothing further —
+ *    without this, a long uninterrupted typing burst would silently drop
+ *    off other players' screens mid-message.
+ *  - Idle for STOP_DELAY_MS, or the box goes empty: sends "stopped".
+ *
+ * This does NOT touch #client_typing_indicator directly — that element is
+ * driven by handleCT.ts / typingState.ts for what OTHER people are typing,
+ * not your own state.
  */
-export function updateTypingIndicator() {
-  const indicator = document.getElementById("client_typing_indicator");
-  if (!indicator) return;
+const STOP_DELAY_MS = 3000;
+const REFRESH_MS = 4000; // must stay under typingState.ts's TYPING_TIMEOUT_MS
 
+let isTyping = false;
+let stopTimer: number | null = null;
+let refreshTimer: number | null = null;
+
+function clearTimers(): void {
+  if (stopTimer !== null) {
+    window.clearTimeout(stopTimer);
+    stopTimer = null;
+  }
+  if (refreshTimer !== null) {
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function stopTyping(): void {
+  clearTimers();
+  if (!isTyping) return;
+  isTyping = false;
+  client.sender.sendTR(false);
+}
+
+function startTyping(): void {
+  if (!isTyping) {
+    isTyping = true;
+    client.sender.sendTR(true);
+    refreshTimer = window.setInterval(
+      () => client.sender.sendTR(true),
+      REFRESH_MS,
+    );
+  }
+  if (stopTimer !== null) window.clearTimeout(stopTimer);
+  stopTimer = window.setTimeout(stopTyping, STOP_DELAY_MS);
+}
+
+export function updateTypingIndicator() {
   const text = (<HTMLInputElement>document.getElementById("client_inputbox"))
     .value;
   if (text.trim() === "") {
-    indicator.textContent = "";
+    stopTyping();
     return;
   }
-
-  const customShowname = (<HTMLInputElement>(
-    document.getElementById("ic_chat_name")
-  )).value;
-  const showCustom =
-    (<HTMLInputElement>document.getElementById("showname")).checked &&
-    customShowname !== "";
-
-  const name = showCustom
-    ? customShowname
-    : client.character?.showname || client.character?.name || "";
-
-  indicator.textContent = name ? `${name} is typing...` : "";
+  startTyping();
 }
 window.updateTypingIndicator = updateTypingIndicator;
+
+/** Immediately signals "stopped typing" — call this once a message sends. */
+export function stopTypingNow(): void {
+  stopTyping();
+}
