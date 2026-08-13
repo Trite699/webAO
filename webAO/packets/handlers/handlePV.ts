@@ -100,7 +100,10 @@ export const handlePV = async (args: string[]) => {
           preanim: preanimName,
           emote: animName,
           zoom: Number(emoteinfo[3]) || 0,
-          deskmod: Number(emoteinfo[4]) || 1,
+          deskmod:
+            emoteinfo[4] === undefined || emoteinfo[4] === ""
+              ? 1
+              : Number(emoteinfo[4]),
           sfx: esfx.toLowerCase(),
           sfxdelay: esfxd,
           frame_screenshake: packPhases("framescreenshake"),
