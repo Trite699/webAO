@@ -1,5 +1,6 @@
 import { client } from "../client";
 import { renderPlayerList } from "./renderPlayerList";
+import { clearAllTyping } from "../client/typingState";
 /**
  * Triggered when an item on the area list is clicked.
  * @param {HTMLElement} el
@@ -13,6 +14,7 @@ export function area_click(el: HTMLElement) {
   areaHr.textContent = `switched to ${el.textContent}`;
   document.getElementById("client_log")!.appendChild(areaHr);
   client.area = Number(el.id.substring(4));
+  clearAllTyping();
   renderPlayerList();
 }
 window.area_click = area_click;
