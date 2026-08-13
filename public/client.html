@@ -920,14 +920,17 @@
         />
         <br />
         <br />
-        <p>16:9 viewport (experimental)</p>
-        <label for="client_hdviewport">Enable:</label>
-        <input
-          type="checkbox"
-          id="client_hdviewport"
-          name="client_hdviewport"
-          onclick="switchAspectRatio()"
-        />
+        <p>Viewport aspect ratio</p>
+        <label for="client_viewport_ratio">Ratio:</label>
+        <select
+          id="client_viewport_ratio"
+          name="client_viewport_ratio"
+          onchange="switchAspectRatio()"
+        >
+          <option value="4:3">4:3 (classic)</option>
+          <option value="5:3">5:3</option>
+          <option value="16:9">16:9 (experimental)</option>
+        </select>
         <br />
         <label for="client_hdviewport_offset">Offset chatbox:</label>
         <input
