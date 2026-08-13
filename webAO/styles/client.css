@@ -487,6 +487,17 @@
   margin: auto;
 }
 
+#client_typing_indicator {
+  font-size: 11px;
+  font-style: italic;
+  color: #aaa;
+  min-height: 14px;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #client_inputbox {
   position: relative;
   font-size: 21px;
