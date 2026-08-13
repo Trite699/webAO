@@ -255,12 +255,14 @@
           </div>
         </div>
       </div>
+      <div id="client_typing_indicator"></div>
       <form onsubmit="return false">
         <input
           id="client_inputbox"
           class="long"
           type="text"
           onkeypress="onEnter(event)"
+          oninput="updateTypingIndicator()"
           placeholder="Say something&hellip;"
           autocomplete="off"
         />
