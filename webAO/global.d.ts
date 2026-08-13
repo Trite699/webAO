@@ -19,5 +19,6 @@ declare global {
     switchPanTilt: () => Promise<void>;
     updateActionCommands: (side: string) => void;
     updateBackgroundPreview: () => void;
+    updateTypingIndicator: () => void;
   }
 }
