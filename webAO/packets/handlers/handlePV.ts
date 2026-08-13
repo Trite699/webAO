@@ -57,6 +57,9 @@ export const handlePV = async (args: string[]) => {
     for (let i = 1; i <= ini.emotions.number; i++) {
       try {
         const emoteinfo = ini.emotions[i].split("#");
+        if (emoteinfo[4] === undefined || emoteinfo[4] === "") {
+          emoteinfo[4] = "1";
+        }
         let esfx;
         let esfxd;
         try {
@@ -100,10 +103,7 @@ export const handlePV = async (args: string[]) => {
           preanim: preanimName,
           emote: animName,
           zoom: Number(emoteinfo[3]) || 0,
-          deskmod:
-            emoteinfo[4] === undefined || emoteinfo[4] === ""
-              ? 1
-              : Number(emoteinfo[4]),
+          deskmod: Number(emoteinfo[4]),
           sfx: esfx.toLowerCase(),
           sfxdelay: esfxd,
           frame_screenshake: packPhases("framescreenshake"),
