@@ -12,6 +12,7 @@ import { sendEE } from "./sendEE";
 import { sendDE } from "./sendDE";
 import { sendPE } from "./sendPE";
 import { sendMA } from "./sendMA";
+import { sendTR } from "./sendTR";
 export interface ISender {
   sendIC: (
     deskmod: number,
@@ -54,6 +55,7 @@ export interface ISender {
   sendDE: (id: number) => void;
   sendPE: (name: string, desc: string, img: string) => void;
   sendMA: (id: number, length: number, reason: string) => void;
+  sendTR: (typing: boolean) => void;
 }
 export const sender = {
   sendIC,
@@ -70,4 +72,5 @@ export const sender = {
   sendDE,
   sendPE,
   sendMA,
+  sendTR,
 };
