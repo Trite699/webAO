@@ -16,30 +16,32 @@ export const handlePU = (args: string[]) => {
   const data = args[3];
 
   switch (type) {
-    case 0:
-      // The typing indicator is piggybacked on OOC (CT) packets (see
-      // typingSignalMarker.ts), which some servers echo back as an OOC
-      // name-change event over PU. Don't let that clobber the player's
-      // real OOC name in the list. Some servers/relays strip control
-      // characters in transit, so also match on the printable core.
-      if (
-        data === TYPING_SIGNAL_MARKER ||
-        data?.includes("webao_typing")
-      ) {
+    case 0: {
+      // Defensive guard, kept even though client/sender/sendTR.ts no
+      // longer sends this: some servers echoed the old typing-signal CT
+      // packet back as an OOC name-change event over PU, which would
+      // otherwise clobber the player's real OOC name in the list. Older
+      // webAO peers still on a build that sends the marker (or any
+      // straggler packets) are covered by this too. Some servers/relays
+      // strip control characters in transit, so also match on the
+      // printable core.
+      if (data === TYPING_SIGNAL_MARKER || data?.includes("webao_typing")) {
         break;
       }
       player.name = data;
       break;
-    case 1:
+    }
+    case 1: {
       player.charName = data;
       const charId = client.chars.findIndex(
-        (c: any) => c && c.name.toLowerCase() === data.toLowerCase()
+        (c: any) => c && c.name.toLowerCase() === data.toLowerCase(),
       );
       if (charId >= 0) {
         player.charId = charId;
         ensureCharIni(charId);
       }
       break;
+    }
     case 2:
       player.showName = data;
       break;
