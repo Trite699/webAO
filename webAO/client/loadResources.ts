@@ -10,6 +10,7 @@ import {
 import { showname_click } from "../dom/showNameClick";
 import { changeBlipVolume } from "../dom/changeBlipVolume";
 import { reloadTheme } from "../dom/reloadTheme";
+import { switchAspectRatio } from "../dom/switchAspectRatio";
 const version = process.env.npm_package_version;
 
 /**
@@ -79,4 +80,13 @@ export const loadResources = () => {
 
   (<HTMLInputElement>document.getElementById("client_callwords")).value =
     localStorage.getItem("callwords");
+
+  const storedRatio = localStorage.getItem("viewportRatio") || "4:3";
+  const ratioSelect = <HTMLSelectElement>(
+    document.getElementById("client_viewport_ratio")
+  );
+  if (ratioSelect && ratioSelect.querySelector(`[value="${storedRatio}"]`)) {
+    ratioSelect.value = storedRatio;
+  }
+  switchAspectRatio();
 };
