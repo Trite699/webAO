@@ -57,8 +57,23 @@ export const handleMS = (args: string[]) => {
     }
 
     if (char_muted === false) {
+      // Normalize deskmod the same way handlePV.ts does for the local
+      // emote-button list: some poses (esp. ones with a preanim but no
+      // explicit desk behavior authored in char.ini) arrive over the wire
+      // as "-" (AO2's standard placeholder for "no value"), which
+      // Number() turns into NaN instead of a usable deskmod. NaN falls
+      // through to viewport.ts's switch(deskmod) statements silently, but
+      // that's fragile -- normalize it explicitly here to "1" (desk
+      // shown), matching handlePV.ts's own fallback, so incoming messages
+      // and locally-sent messages agree on what "no deskmod" means.
+      const rawDeskmod = safeTags(args[1]).toLowerCase();
+      const deskmod =
+        rawDeskmod === "" || rawDeskmod === "-" || Number.isNaN(Number(rawDeskmod))
+          ? 1
+          : Number(rawDeskmod);
+
       let chatmsg = {
-        deskmod: Number(safeTags(args[1]).toLowerCase()),
+        deskmod,
         preanim: safeTags(args[2]).toLowerCase(), // get preanim
         nameplate: msg_nameplate,
         chatbox: char_chatbox,
