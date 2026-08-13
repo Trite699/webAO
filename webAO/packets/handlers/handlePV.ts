@@ -68,18 +68,44 @@ export const handlePV = async (args: string[]) => {
         }
 
         const url = `${charPath}button${i}_off${emoteExtension}`;
+        const preanimName = emoteinfo[1].toLowerCase();
+        const animName = emoteinfo[2].toLowerCase();
+
+        // Per-frame effects live in char.ini as one section per animation,
+        // e.g. "[guitarpound_FrameSFX]" with "53 = sfx-deskslam". iniParse
+        // lowercases both section and key names, so section lookups here
+        // must be lowercase too. There's one section per phase: preanim
+        // uses the preanim sprite's section, talking/idle both use the
+        // "emote" sprite's section (AO2 char.ini has no separate idle name).
+        const packPhases = (suffix: string): string => {
+          const sections = [preanimName, animName, animName].map(
+            (name) => ini[`${name}_${suffix}`],
+          );
+          const parts = sections.map((sec) => {
+            if (!sec) return "";
+            return Object.entries(sec)
+              .map(([frame, val]) => `${frame}=${val}`)
+              .join("|");
+          });
+          // Leading "|" before each phase's data: frameEffects.ts's
+          // splitPhases() skips index 0 after splitting on "|", so an
+          // empty first segment is intentional, not a placeholder to fill.
+          return parts.every((p) => p === "")
+            ? ""
+            : `${parts.map((p) => `|${p}`).join("^")}^`;
+        };
 
         emotes[i] = {
           desc: emoteinfo[0].toLowerCase(),
-          preanim: emoteinfo[1].toLowerCase(),
-          emote: emoteinfo[2].toLowerCase(),
+          preanim: preanimName,
+          emote: animName,
           zoom: Number(emoteinfo[3]) || 0,
           deskmod: Number(emoteinfo[4]) || 1,
           sfx: esfx.toLowerCase(),
           sfxdelay: esfxd,
-          frame_screenshake: "",
-          frame_realization: "",
-          frame_sfx: "",
+          frame_screenshake: packPhases("framescreenshake"),
+          frame_realization: packPhases("framerealization"),
+          frame_sfx: packPhases("framesfx"),
           button: url,
         };
 
