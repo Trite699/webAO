@@ -1,6 +1,7 @@
 import { client } from "../../client";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
 import { renderPlayerList } from "../../dom/renderPlayerList";
+import { TYPING_SIGNAL_MARKER } from "../../client/typingSignalMarker";
 
 /**
  * Handles a playerlist update
@@ -16,6 +17,17 @@ export const handlePU = (args: string[]) => {
 
   switch (type) {
     case 0:
+      // The typing indicator is piggybacked on OOC (CT) packets (see
+      // typingSignalMarker.ts), which some servers echo back as an OOC
+      // name-change event over PU. Don't let that clobber the player's
+      // real OOC name in the list. Some servers/relays strip control
+      // characters in transit, so also match on the printable core.
+      if (
+        data === TYPING_SIGNAL_MARKER ||
+        data?.includes("webao_typing")
+      ) {
+        break;
+      }
       player.name = data;
       break;
     case 1:
