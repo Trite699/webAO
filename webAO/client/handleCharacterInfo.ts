@@ -3,6 +3,19 @@ import { safeTags } from "../encoding";
 import iniParse from "../iniParse";
 import request from "../services/request";
 import { AO_HOST } from "./aoHost";
+import { getLocalCharacterSync } from "../utils/localCharacterStore";
+import { getLocalIconUrl } from "../utils/resolveLocalAsset";
+
+/**
+ * Resolves the character icon src, preferring a locally-imported
+ * character's own icon over the network guess.
+ */
+function iconSrcFor(name: string): string {
+  const localIcon = getLocalIconUrl(name, client.charicon_extensions);
+  if (localIcon) return localIcon;
+  const iconExt = client.charicon_extensions[0] || ".png";
+  return `${AO_HOST}characters/${encodeURI(name.toLowerCase())}/char_icon${iconExt}`;
+}
 
 /**
  * Lightweight character setup that runs on join. Sets the icon src directly
@@ -14,12 +27,7 @@ export const setupCharacterBasic = (chargs: string[], charid: number) => {
   if (chargs[0]) {
     img.alt = chargs[0];
     img.title = chargs[0];
-    const iconExt = client.charicon_extensions[0] || ".png";
-    img.src = `${AO_HOST}characters/${encodeURI(
-      chargs[0].toLowerCase(),
-    )}/char_icon${iconExt}`;
-
-    // Mirror into the AO2-style left list entry, if present.
+    img.src = iconSrcFor(chargs[0]);
     const listIcon = <HTMLImageElement>(
       document.getElementById(`charlist_icon_${charid}`)
     );
@@ -72,10 +80,13 @@ export const ensureCharIni = async (charid: number): Promise<any> => {
   const img = <HTMLImageElement>document.getElementById(`demo_${charid}`);
   let cini: any = {};
 
+  const localChar = getLocalCharacterSync(char.name);
   try {
-    const cinidata = await request(
-      `${AO_HOST}characters/${encodeURI(char.name.toLowerCase())}/char.ini`,
-    );
+    const cinidata = localChar
+      ? localChar.iniText
+      : await request(
+          `${AO_HOST}characters/${encodeURI(char.name.toLowerCase())}/char.ini`,
+        );
     cini = iniParse(cinidata);
   } catch (err) {
     cini = {};
@@ -130,12 +141,7 @@ export const handleCharacterInfo = async (chargs: string[], charid: number) => {
   if (chargs[0]) {
     img.alt = chargs[0];
     img.title = chargs[0];
-    const iconExt = client.charicon_extensions[0] || ".png";
-    img.src = `${AO_HOST}characters/${encodeURI(
-      chargs[0].toLowerCase(),
-    )}/char_icon${iconExt}`;
-
-    // Reset inifile so ensureCharIni will re-fetch
+    img.src = iconSrcFor(chargs[0]);
     if (client.chars[charid]) {
       client.chars[charid].name = safeTags(chargs[0]);
       client.chars[charid].inifile = null;
