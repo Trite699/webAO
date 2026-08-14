@@ -36,14 +36,14 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="
-		script-src-elem 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
-		style-src-elem 'self' 'unsafe-inline' https://golden-layout.com;
-		script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hcaptcha.com https://*.hcaptcha.com;
-		style-src 'self' 'unsafe-inline' https://golden-layout.com https://hcaptcha.com https://*.hcaptcha.com;
-		img-src 'self' data: file: *;
-		frame-src https://hcaptcha.com https://*.hcaptcha.com;
-		connect-src 'self' ws: file: * https://hcaptcha.com https://*.hcaptcha.com;
-		media-src 'self' file: *;"
+        script-src-elem 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
+        style-src-elem 'self' 'unsafe-inline' https://golden-layout.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hcaptcha.com https://*.hcaptcha.com;
+        style-src 'self' 'unsafe-inline' https://golden-layout.com https://hcaptcha.com https://*.hcaptcha.com;
+        img-src 'self' data: file: *;
+        frame-src https://hcaptcha.com https://*.hcaptcha.com;
+        connect-src 'self' ws: file: * https://hcaptcha.com https://*.hcaptcha.com;
+        media-src 'self' file: *;"
     />
 
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
@@ -893,10 +893,10 @@
           <option value="yttd">YTTD</option>
         </select>
         <!--
-			<br>
-			<br>
-			<button id="client_modcall" onclick="modcall_test()">Test modcall</button>
-			-->
+            <br>
+            <br>
+            <button id="client_modcall" onclick="modcall_test()">Test modcall</button>
+            -->
         <br />
         <br />
         <p>Ini editing (experimental)</p>
@@ -941,19 +941,21 @@
         />
         <br />
         <br />
-        <p>16:9 viewport (experimental)</p>
-        <label for="client_hdviewport">Enable:</label>
-        <input
-          type="checkbox"
-          id="client_hdviewport"
-          name="client_hdviewport"
-          onclick="switchAspectRatio()"
-        />
+        <p>Viewport aspect ratio</p>
+        <label for="client_viewport_ratio">Ratio:</label>
+        <select
+          id="client_viewport_ratio"
+          name="client_viewport_ratio"
+          onchange="switchAspectRatio()"
+        >
+          <option value="4:3">4:3 (classic)</option>
+          <option value="5:3">5:3</option>
+          <option value="16:9">16:9 (experimental)</option>
+        </select>
         <br />
         <label for="client_hdviewport_offset">Offset chatbox:</label>
         <input
           type="checkbox"
-          id="client_hdviewport_offset"
           id="client_hdviewport_offset"
           onclick="switchChatOffset()"
         />
@@ -1001,7 +1003,7 @@
         </p>
         <p>Special thanks to Aleks for the first webAO PoC.</p>
         <p><a href="styles/igiari/readme.txt">Igiari font by Caveras</a></p>
-		<p>Fixes by Walter Trite</p>
+        <p>Fixes by Walter Trite</p>
       </span>
     </div>
   </template>
