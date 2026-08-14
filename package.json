@@ -57,6 +57,7 @@
     "esbuild-loader": "^4.4.2",
     "golden-layout": "^2.6.0",
     "jest-environment-jsdom": "^29.7.0",
+    "jszip": "^3.10.1",
     "regenerator-runtime": "^0.13.11",
     "source-map-loader": "^4.0.2",
     "ts-loader": "^9.5.4"
