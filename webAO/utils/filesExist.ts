@@ -1,4 +1,5 @@
 import fileExists from "./fileExists";
+import { getLocalOverrideUrl } from "./resolveLocalAsset";
 
 /**
  * This function takes a list of urls and returns the first one that exists.
@@ -11,7 +12,7 @@ export default async function filesExist(
 ): Promise<string | null> {
   const promises = urls.map(async (url) => {
     if (await fileExists(url)) {
-      return url;
+      return getLocalOverrideUrl(url) ?? url;
     }
     return null;
   });
