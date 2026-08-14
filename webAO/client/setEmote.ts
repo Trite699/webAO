@@ -1,6 +1,7 @@
 import Client from "../client";
 import transparentPng from "../constants/transparentPng";
 import fileExists from "../utils/fileExists";
+import { getLocalOverrideUrl } from "../utils/resolveLocalAsset";
 
 /**
  * Sets all the img tags to the right sources
@@ -48,7 +49,7 @@ const setEmote = async (
     }
     const exists = await fileExists(url);
     if (exists) {
-      emoteSelector.src = url;
+      emoteSelector.src = getLocalOverrideUrl(url) ?? url;
       break;
     }
   }
