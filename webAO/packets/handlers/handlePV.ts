@@ -4,6 +4,7 @@ import { updateActionCommands } from "../../dom/updateActionCommands";
 import { pickEmotion } from "../../dom/pickEmotion";
 import { AO_HOST } from "../../client/aoHost";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
 
 function addEmoteButton(i: number, imgurl: string, desc: string) {
   const emotesList = document.getElementById("client_emo");
@@ -70,7 +71,8 @@ export const handlePV = async (args: string[]) => {
           esfxd = 0;
         }
 
-        const url = `${charPath}button${i}_off${emoteExtension}`;
+        const rawUrl = `${charPath}button${i}_off${emoteExtension}`;
+        const url = getLocalOverrideUrl(rawUrl) ?? rawUrl;
         const preanimName = emoteinfo[1].toLowerCase();
         const animName = emoteinfo[2].toLowerCase();
 
