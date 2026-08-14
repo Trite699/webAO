@@ -21,7 +21,20 @@ export function resolveLocalFile(
   if (!record) return null;
 
   const key = filename.toLowerCase();
-  const blob = record.files[key];
+  let blob = record.files[key];
+
+  if (!blob) {
+    // webAO's URL builders always construct "(a)"/"(b)" as a filename
+    // PREFIX (e.g. "(a)normal.webp"), but some character packs (Case
+    // Cafe/KFO-style) instead organize idle/talking sprites into "(a)/"
+    // and "(b)/" SUBFOLDERS (e.g. "(a)/normal.webp"). Retry with a folder
+    // separator inserted after the prefix before giving up.
+    const prefixMatch = /^(\(a\)|\(b\))(.+)$/.exec(key);
+    if (prefixMatch) {
+      blob = record.files[`${prefixMatch[1]}/${prefixMatch[2]}`];
+    }
+  }
+
   if (!blob) return null;
 
   const cacheKey = `${record.name}::${key}`;
