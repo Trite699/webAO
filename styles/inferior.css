@@ -104,3 +104,11 @@ select {
   background-color: #8b8b8b;
   color: #000;
 }
+
+.ooc_embed_img {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  margin-top: 4px;
+  cursor: pointer;
+}
