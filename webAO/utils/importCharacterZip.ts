@@ -70,6 +70,12 @@ async function importCharacterZipBlob(
     files,
   });
 
+  // eslint-disable-next-line no-console
+  console.log(
+    `[local character] Imported "${resolvedName}" (stored as "${resolvedName.toLowerCase()}"). ` +
+      `Stored files (${Object.keys(files).length}): ${Object.keys(files).join(", ") || "(none)"}`,
+  );
+
   return resolvedName;
 }
 
