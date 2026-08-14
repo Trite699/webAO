@@ -13,6 +13,7 @@ import mlConfig from "../../utils/aoml";
 import request from "../../services/request";
 import preloadMessageAssets from "./preloadMessageAssets";
 import { getShoutLogText } from "./getShoutLogText";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
 
 let attorneyMarkdown: ReturnType<typeof mlConfig> | null = null;
 export let markdownDisabled = false;
@@ -133,26 +134,16 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
   client.viewport.setLastCharacter(client.viewport.getChatmsg().name);
 
   const shoutLogText = getShoutLogText(client.viewport.getChatmsg());
-  const messageContent = client.viewport.getChatmsg().content;
+  const icLogText =
+    client.viewport.getChatmsg().content.trim() === "" && shoutLogText
+      ? shoutLogText
+      : client.viewport.getChatmsg().content;
 
-  if (shoutLogText) {
-    // Log the shout ("<name> shouts Objection!") as its own line first, so
-    // it always shows up even when the message also has text attached.
-    appendICLog(
-      shoutLogText,
-      client.viewport.getChatmsg().showname,
-      client.viewport.getChatmsg().nameplate,
-    );
-  }
-  if (messageContent.trim() !== "" || !shoutLogText) {
-    // Then log the actual message content, unless the message was nothing
-    // but a shout (in which case the shout line above already covers it).
-    appendICLog(
-      messageContent,
-      client.viewport.getChatmsg().showname,
-      client.viewport.getChatmsg().nameplate,
-    );
-  }
+  appendICLog(
+    icLogText,
+    client.viewport.getChatmsg().showname,
+    client.viewport.getChatmsg().nameplate,
+  );
 
   checkCallword(
     client.viewport.getChatmsg().content,
@@ -182,9 +173,10 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
     // Hide message box
     chatContainerBox.style.opacity = "0";
     if (client.viewport.getChatmsg().objection === 4) {
-      shoutSprite.src = `${AO_HOST}characters/${encodeURI(
+      const customShoutUrl = `${AO_HOST}characters/${encodeURI(
         client.viewport.getChatmsg().name!.toLowerCase(),
       )}/custom.gif`;
+      shoutSprite.src = getLocalOverrideUrl(customShoutUrl) ?? customShoutUrl;
     } else {
       shoutSprite.src = client.resources[shout].src;
       shoutSprite.style.animation = "bubble 700ms steps(10, jump-both)";
