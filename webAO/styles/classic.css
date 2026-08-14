@@ -229,3 +229,11 @@ hr {
   background-color: #575757;
   color: #000;
 }
+
+.ooc_embed_img {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  margin-top: 4px;
+  cursor: pointer;
+}
