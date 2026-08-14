@@ -401,18 +401,8 @@
 #client_testimony {
   display: block;
   position: absolute;
-  /* These banners ("Witness Testimony" / "Cross Examination" / verdict
-     graphics) are meant to span the full width of the courtroom. They used
-     to scale by height with width:auto, which only looked right by
-     coincidence when the viewport was always 4:3 (the banner art's own
-     native aspect ratio happened to match). With multiple viewport ratios
-     now selectable, scale by width instead so it always spans edge to
-     edge, and center vertically since it no longer fills the full height. */
-  width: 100%;
-  height: auto;
-  top: 50%;
-  left: 0;
-  transform: translateY(-50%);
+  height: 100%;
+  width: auto;
 }
 
 @keyframes bubble {
@@ -619,6 +609,19 @@
   resize: none;
   flex: 1 1 auto;
   border: none;
+}
+
+/* Inline thumbnail for image links embedded in OOC messages
+   (see handleCT.ts's embedImages()). Capped so a pasted image can't
+   blow out the log's height; click it to open the full image. */
+.ooc_embed_img {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  margin-top: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  object-fit: contain;
 }
 
 #client_oocinput {
@@ -829,4 +832,14 @@
 .hrtext:after {
   left: 0.5em;
   margin-right: -50%;
+}
+
+.ooc_embed_img {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  margin-top: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  object-fit: contain;
 }
