@@ -47,9 +47,18 @@ const setEmote = async (
         prefix,
       )}${encodeURI(emotename)}${extension}`;
     }
+
+    // 1. Check if the file exists in local storage FIRST
+    const localUrl = getLocalOverrideUrl(url);
+    if (localUrl) {
+      emoteSelector.src = localUrl;
+      break; // Stop looking, we found the local sprite!
+    }
+
+    // 2. ONLY hit the network asset directory if it wasn't found locally
     const exists = await fileExists(url);
     if (exists) {
-      emoteSelector.src = getLocalOverrideUrl(url) ?? url;
+      emoteSelector.src = url;
       break;
     }
   }
