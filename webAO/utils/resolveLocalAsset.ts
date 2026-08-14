@@ -63,7 +63,24 @@ export function parseCharacterAssetUrl(
 export function getLocalOverrideUrl(url: string): string | null {
   const parsed = parseCharacterAssetUrl(url);
   if (!parsed) return null;
-  return resolveLocalFile(parsed.charactername, parsed.filename);
+
+  const record = getLocalCharacterSync(parsed.charactername);
+  if (!record) return null; // not a locally-imported character -- fall through silently
+
+  const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
+  if (!resolved) {
+    // The character IS local, but this specific file isn't in its files
+    // map -- almost always a filename/casing mismatch between what the
+    // char.ini/pose expects and what's actually in the zip. Logging this
+    // (rather than just falling through) makes that mismatch visible
+    // instead of silently hitting the network and looking like local
+    // characters "don't work" for no obvious reason.
+    console.warn(
+      `[local character] "${record.displayName}" is loaded locally, but "${parsed.filename}" wasn't found in it. ` +
+        `Falling back to network. Files actually stored for this character: ${Object.keys(record.files).join(", ") || "(none)"}`,
+    );
+  }
+  return resolved;
 }
 
 /** Tries each icon extension in order against a local character's files. */
