@@ -401,8 +401,18 @@
 #client_testimony {
   display: block;
   position: absolute;
-  height: 100%;
-  width: auto;
+  /* These banners ("Witness Testimony" / "Cross Examination" / verdict
+     graphics) are meant to span the full width of the courtroom. They used
+     to scale by height with width:auto, which only looked right by
+     coincidence when the viewport was always 4:3 (the banner art's own
+     native aspect ratio happened to match). With multiple viewport ratios
+     now selectable, scale by width instead so it always spans edge to
+     edge, and center vertically since it no longer fills the full height. */
+  width: 100%;
+  height: auto;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
 }
 
 @keyframes bubble {
