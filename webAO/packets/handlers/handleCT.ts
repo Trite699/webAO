@@ -30,7 +30,7 @@ export const handleCT = (args: string[]) => {
   if (mode !== "replay") {
     const oocLog = document.getElementById("client_ooclog")!;
     const username = prepChat(args[1]);
-    let message = addLinks(prepChat(args[2]));
+    let message = embedImages(prepChat(args[2]));
     // Replace newlines with br
     message = message.replace(/\n/g, "<br>");
 
@@ -40,11 +40,26 @@ export const handleCT = (args: string[]) => {
   }
 };
 
-// If the incoming message contains a link, add a href hyperlink to it
-function addLinks(message: string) {
+const IMAGE_EXTENSION_REGEX = /\.(png|jpe?g|gif|webp|bmp|svg)(\?\S*)?$/i;
+
+// If the incoming message contains a link, add a href hyperlink to it.
+// Links that point straight at an image get rendered as an inline
+// thumbnail instead of plain text -- click it to open the full image in
+// a new tab. Runs on already-escaped text (see prepChat/safeTags), so
+// the only real markup introduced here is the <a>/<img> tags we build.
+function embedImages(message: string) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return message.replace(
-    urlRegex,
-    (url) => `<a href="${url}" target="_blank">${url}</a>`,
-  );
+  return message.replace(urlRegex, (url) => {
+    if (IMAGE_EXTENSION_REGEX.test(url)) {
+      return (
+        `<a href="${url}" target="_blank" rel="noopener noreferrer">` +
+        `<img src="${url}" class="ooc_embed_img" loading="lazy" ` +
+        `referrerpolicy="no-referrer" ` +
+        `onerror="this.style.display='none';this.nextSibling.style.display='inline';">` +
+        `<span class="ooc_embed_fallback" style="display:none;">${url}</span>` +
+        `</a>`
+      );
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
 }
