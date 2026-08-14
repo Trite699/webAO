@@ -913,9 +913,7 @@
         <p>Local characters</p>
         <p style="font-size: small; opacity: 0.8; max-width: 420px">
           Import a character folder as a .zip (or paste a link to one) to
-          use it without it needing to be uploaded to the server. It only
-          renders correctly for other players who've also imported it
-          locally under the same name.
+          use it without it needing to be uploaded to the web files. 
         </p>
         <input id="local_char_zip_input" type="file" accept=".zip" />
         <br />
@@ -931,7 +929,7 @@
         <div id="local_char_list"></div>
         <br />
         <br />
-        <p>Pan-tilt (experimental)</p>
+        <p>Slide</p>
         <label for="client_pantilt">Enable:</label>
         <input
           type="checkbox"
@@ -941,16 +939,16 @@
         />
         <br />
         <br />
-        <p>Viewport aspect ratio</p>
+        <p>Viewport Aspect Ratio</p>
         <label for="client_viewport_ratio">Ratio:</label>
         <select
           id="client_viewport_ratio"
           name="client_viewport_ratio"
           onchange="switchAspectRatio()"
         >
-          <option value="4:3">4:3 (classic)</option>
+          <option value="4:3">4:3 (default)</option>
           <option value="5:3">5:3</option>
-          <option value="16:9">16:9 (experimental)</option>
+          <option value="16:9">16:9 (widescreen)</option>
         </select>
         <br />
         <label for="client_hdviewport_offset">Offset chatbox:</label>
@@ -997,13 +995,14 @@
           <a href="https://github.com/qubrick">Qubrick</a>.
         </p>
         <p>
-          <a href="https://github.com/AttorneyOnline/webAO"
+          <a href="https://github.com/Trite699/webAO"
             >Follow development on our GitHub</a
           >
         </p>
         <p>Special thanks to Aleks for the first webAO PoC.</p>
         <p><a href="styles/igiari/readme.txt">Igiari font by Caveras</a></p>
-        <p>Fixes by Walter Trite</p>
+        <p>Additional fixes and additions by</p>
+        <p><a href="https://github.com/Trite699">Walter Trite</a></p>
       </span>
     </div>
   </template>
