@@ -59,8 +59,23 @@ async function importCharacterZipBlob(
     if (!entry.name.startsWith(rootDir)) continue; // ignore stray sibling files
     const relativePath = entry.name.slice(rootDir.length).toLowerCase();
     if (!relativePath) continue;
+
+    // 1. Get raw binary data instead of a "dumb" blob
     // eslint-disable-next-line no-await-in-loop
-    files[relativePath] = await entry.async("blob");
+    const rawData = await entry.async("arraybuffer");
+
+    // 2. Assign the correct MIME type based on the file extension
+    let mimeType = "application/octet-stream";
+    if (relativePath.endsWith(".gif")) mimeType = "image/gif";
+    else if (relativePath.endsWith(".webp")) mimeType = "image/webp";
+    else if (relativePath.endsWith(".png")) mimeType = "image/png";
+    else if (relativePath.endsWith(".jpg") || relativePath.endsWith(".jpeg")) mimeType = "image/jpeg";
+    else if (relativePath.endsWith(".opus") || relativePath.endsWith(".ogg")) mimeType = "audio/ogg";
+    else if (relativePath.endsWith(".mp3")) mimeType = "audio/mpeg";
+    else if (relativePath.endsWith(".wav")) mimeType = "audio/wav";
+
+    // 3. Create a smart Blob that tells the browser EXACTLY what it is
+    files[relativePath] = new Blob([rawData], { type: mimeType });
   }
 
   await saveLocalCharacter({
