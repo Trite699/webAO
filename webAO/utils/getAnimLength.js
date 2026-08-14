@@ -5,6 +5,7 @@
 import calculatorHandler from "./calculatorHandler";
 import fileExists from "./fileExists";
 import { requestBuffer } from "../services/request";
+import { getLocalOverrideUrl } from "./resolveLocalAsset";
 /**
  * Gets animation length. If the animation cannot be found, it will
  * silently fail and return 0 instead.
@@ -21,7 +22,8 @@ const getAnimLength = async (url) => {
     const urlWithExtension = url + extension;
     const exists = await fileExists(urlWithExtension);
     if (exists) {
-      const fileBuffer = await requestBuffer(urlWithExtension);
+      const resolvedUrl = getLocalOverrideUrl(urlWithExtension) || urlWithExtension;
+      const fileBuffer = await requestBuffer(resolvedUrl);
       const length = calculatorHandler[extension](fileBuffer);
       return length;
     }
