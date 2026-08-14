@@ -133,16 +133,26 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
   client.viewport.setLastCharacter(client.viewport.getChatmsg().name);
 
   const shoutLogText = getShoutLogText(client.viewport.getChatmsg());
-  const icLogText =
-    client.viewport.getChatmsg().content.trim() === "" && shoutLogText
-      ? shoutLogText
-      : client.viewport.getChatmsg().content;
+  const messageContent = client.viewport.getChatmsg().content;
 
-  appendICLog(
-    icLogText,
-    client.viewport.getChatmsg().showname,
-    client.viewport.getChatmsg().nameplate,
-  );
+  if (shoutLogText) {
+    // Log the shout ("<name> shouts Objection!") as its own line first, so
+    // it always shows up even when the message also has text attached.
+    appendICLog(
+      shoutLogText,
+      client.viewport.getChatmsg().showname,
+      client.viewport.getChatmsg().nameplate,
+    );
+  }
+  if (messageContent.trim() !== "" || !shoutLogText) {
+    // Then log the actual message content, unless the message was nothing
+    // but a shout (in which case the shout line above already covers it).
+    appendICLog(
+      messageContent,
+      client.viewport.getChatmsg().showname,
+      client.viewport.getChatmsg().nameplate,
+    );
+  }
 
   checkCallword(
     client.viewport.getChatmsg().content,
