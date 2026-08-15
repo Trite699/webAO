@@ -5,6 +5,7 @@ import { pickEmotion } from "../../dom/pickEmotion";
 import { AO_HOST } from "../../client/aoHost";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
 import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { loadSoundList } from "../../client/loadSoundList";
 
 function addEmoteButton(i: number, imgurl: string, desc: string) {
   const emotesList = document.getElementById("client_emo");
@@ -37,6 +38,7 @@ export const handlePV = async (args: string[]) => {
   emotesList.style.display = "";
   emotesList.innerHTML = ""; // Clear emote box
   const ini = await ensureCharIni(client.charID);
+  loadSoundList(me.name);
   me.side = ini.options.side;
   updateActionCommands(me.side);
   if (ini.emotions.number === 0) {
