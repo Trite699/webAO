@@ -31,7 +31,7 @@ export function onEnter(event: KeyboardEvent) {
     const showname = escapeChat(
       (<HTMLInputElement>document.getElementById("ic_chat_name")).value,
     );
-    const text = (<HTMLInputElement>document.getElementById("client_inputbox"))
+    let text = (<HTMLInputElement>document.getElementById("client_inputbox"))
       .value;
     const pairchar = (<HTMLInputElement>document.getElementById("pair_select"))
       .value;
@@ -41,10 +41,34 @@ export function onEnter(event: KeyboardEvent) {
     const pairyoffset = Number(
       (<HTMLInputElement>document.getElementById("pair_y_offset")).value,
     );
-    const myrole = (<HTMLInputElement>document.getElementById("role_select"))
+    let myrole = (<HTMLInputElement>document.getElementById("role_select"))
       .value
       ? (<HTMLInputElement>document.getElementById("role_select")).value
       : mychar.side;
+
+    // "/pos <name>" chat-command shortcut: switches position without
+    // touching the Role dropdown. Anything typed after the position name
+    // is still sent as the IC message; if nothing else was typed, no IC
+    // message is sent at all -- it's purely a position change.
+    const posMatch = /^\/pos\s+(\S+)\s*(.*)$/i.exec(text);
+    if (posMatch) {
+      myrole = posMatch[1].toLowerCase();
+      text = posMatch[2];
+
+      const roleSelect = <HTMLSelectElement>(
+        document.getElementById("role_select")
+      );
+      const matchingOption = Array.from(roleSelect.options).find(
+        (opt) => opt.value.toLowerCase() === myrole,
+      );
+      if (matchingOption) roleSelect.value = matchingOption.value;
+
+      if (!text) {
+        (<HTMLInputElement>document.getElementById("client_inputbox")).value =
+          "";
+        return false;
+      }
+    }
     const additive = Boolean(
       (<HTMLInputElement>document.getElementById("check_additive")).checked,
     );
@@ -55,8 +79,14 @@ export function onEnter(event: KeyboardEvent) {
     let sfxdelay = 0;
     let emote_mod = myemo.zoom;
     if ((<HTMLInputElement>document.getElementById("sendsfx")).checked) {
-      sfxname = myemo.sfx;
-      sfxdelay = myemo.sfxdelay;
+      const customSfx = (<HTMLInputElement>(
+        document.getElementById("sfx_name_input")
+      )).value.trim();
+      sfxname = customSfx || myemo.sfx;
+      // A custom sound has no char.ini-declared delay of its own; only use
+      // the pose's default delay when we're also using the pose's default
+      // sound, otherwise play it immediately.
+      sfxdelay = customSfx ? 0 : myemo.sfxdelay;
     }
 
     // not to overwrite a 5 from the ini or anything else
