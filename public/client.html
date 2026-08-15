@@ -36,14 +36,14 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="
-        script-src-elem 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
-        style-src-elem 'self' 'unsafe-inline' https://golden-layout.com;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hcaptcha.com https://*.hcaptcha.com;
-        style-src 'self' 'unsafe-inline' https://golden-layout.com https://hcaptcha.com https://*.hcaptcha.com;
-        img-src 'self' data: file: blob: *;
-        frame-src https://hcaptcha.com https://*.hcaptcha.com;
-        connect-src 'self' ws: file: * https://hcaptcha.com https://*.hcaptcha.com;
-        media-src 'self' file: blob: *;"
+		script-src-elem 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
+		style-src-elem 'self' 'unsafe-inline' https://golden-layout.com;
+		script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hcaptcha.com https://*.hcaptcha.com;
+		style-src 'self' 'unsafe-inline' https://golden-layout.com https://hcaptcha.com https://*.hcaptcha.com;
+		img-src 'self' data: file: *;
+		frame-src https://hcaptcha.com https://*.hcaptcha.com;
+		connect-src 'self' ws: file: * https://hcaptcha.com https://*.hcaptcha.com;
+		media-src 'self' file: *;"
     />
 
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
@@ -336,6 +336,14 @@
             value="sendsfx"
             checked
           />
+          <input
+            id="sfx_name_input"
+            name="sfx_name_input"
+            list="sfx_datalist"
+            placeholder="(pose's default sound)"
+            style="width: 140px"
+          />
+          <datalist id="sfx_datalist"></datalist>
           <label for="sendpreanim"> Preanimation: </label>
           <input
             type="checkbox"
@@ -893,10 +901,10 @@
           <option value="yttd">YTTD</option>
         </select>
         <!--
-            <br>
-            <br>
-            <button id="client_modcall" onclick="modcall_test()">Test modcall</button>
-            -->
+			<br>
+			<br>
+			<button id="client_modcall" onclick="modcall_test()">Test modcall</button>
+			-->
         <br />
         <br />
         <p>Ini editing (experimental)</p>
@@ -913,7 +921,9 @@
         <p>Local characters</p>
         <p style="font-size: small; opacity: 0.8; max-width: 420px">
           Import a character folder as a .zip (or paste a link to one) to
-          use it without it needing to be uploaded to the web files. 
+          use it without it needing to be uploaded to the server. It only
+          renders correctly for other players who've also imported it
+          locally under the same name.
         </p>
         <input id="local_char_zip_input" type="file" accept=".zip" />
         <br />
@@ -929,7 +939,7 @@
         <div id="local_char_list"></div>
         <br />
         <br />
-        <p>Slide</p>
+        <p>Pan-tilt (experimental)</p>
         <label for="client_pantilt">Enable:</label>
         <input
           type="checkbox"
@@ -939,21 +949,19 @@
         />
         <br />
         <br />
-        <p>Viewport Aspect Ratio</p>
-        <label for="client_viewport_ratio">Ratio:</label>
-        <select
-          id="client_viewport_ratio"
-          name="client_viewport_ratio"
-          onchange="switchAspectRatio()"
-        >
-          <option value="4:3">4:3 (default)</option>
-          <option value="5:3">5:3</option>
-          <option value="16:9">16:9 (widescreen)</option>
-        </select>
+        <p>16:9 viewport (experimental)</p>
+        <label for="client_hdviewport">Enable:</label>
+        <input
+          type="checkbox"
+          id="client_hdviewport"
+          name="client_hdviewport"
+          onclick="switchAspectRatio()"
+        />
         <br />
         <label for="client_hdviewport_offset">Offset chatbox:</label>
         <input
           type="checkbox"
+          id="client_hdviewport_offset"
           id="client_hdviewport_offset"
           onclick="switchChatOffset()"
         />
@@ -995,14 +1003,13 @@
           <a href="https://github.com/qubrick">Qubrick</a>.
         </p>
         <p>
-          <a href="https://github.com/Trite699/webAO"
+          <a href="https://github.com/AttorneyOnline/webAO"
             >Follow development on our GitHub</a
           >
         </p>
         <p>Special thanks to Aleks for the first webAO PoC.</p>
         <p><a href="styles/igiari/readme.txt">Igiari font by Caveras</a></p>
-        <p>Additional fixes and additions by</p>
-        <p><a href="https://github.com/Trite699">Walter Trite</a></p>
+		<p>Fixes by Walter Trite</p>
       </span>
     </div>
   </template>
