@@ -316,11 +316,22 @@
             onclick="toggleShout(4)"
             style="display: none"
           >
-            Custom
+            Custom Shout
           </button>
           <br />
           <br />
           <label for="textcolor">Text Color:</label>
+          </span>
+                        <div class="ic_overrides">
+                            <input id="sfx_override" list="sfx_datalist" placeholder="Override SFX…" autocomplete="off" title="Override the emote's sound. Pick from the list or type any sound name (from base/sounds/general). Leave blank for the emote's default."/>
+                            <datalist id="sfx_datalist"></datalist>
+                            <input id="blip_override" list="blip_datalist" placeholder="Override blips…" autocomplete="off" title="Override the typing blips for your messages. Pick from the list or type any blip name (from base/sounds/blips), or 'none' for silent. Leave blank for the emote's default."/>
+                            <datalist id="blip_datalist">
+                                <option value="male"></option>
+                                <option value="female"></option>
+                                <option value="normal"></option>
+                                <option value="none"></option>
+                            </datalist>
           <select id="textcolor" name="textcolor">
             <option value="0">White</option>
             <option value="1">Green</option>
@@ -907,7 +918,7 @@
             -->
         <br />
         <br />
-        <p>Ini editing (experimental)</p>
+        <p>Ini editing</p>
         <label for="client_iniselect">Iniedit Character:</label>
         <select
           id="client_iniselect"
@@ -921,9 +932,7 @@
         <p>Local characters</p>
         <p style="font-size: small; opacity: 0.8; max-width: 420px">
           Import a character folder as a .zip (or paste a link to one) to
-          use it without it needing to be uploaded to the server. It only
-          renders correctly for other players who've also imported it
-          locally under the same name.
+          use it without it needing to be uploaded to the web files.
         </p>
         <input id="local_char_zip_input" type="file" accept=".zip" />
         <br />
@@ -939,24 +948,27 @@
         <div id="local_char_list"></div>
         <br />
         <br />
-        <p>Pan-tilt (experimental)</p>
+        <p>Slide</p>
         <label for="client_pantilt">Enable:</label>
         <input
           type="checkbox"
           id="client_pantilt"
           name="client_pantilt"
           onclick="switchPanTilt()"
-        />
+               />
         <br />
         <br />
-        <p>16:9 viewport (experimental)</p>
-        <label for="client_hdviewport">Enable:</label>
-        <input
-          type="checkbox"
-          id="client_hdviewport"
-          name="client_hdviewport"
-          onclick="switchAspectRatio()"
-        />
+        <p>Viewport Aspect Ratio</p>
+        <label for="client_viewport_ratio">Ratio:</label>
+        <select
+          id="client_viewport_ratio"
+          name="client_viewport_ratio"
+          onchange="switchAspectRatio()"
+        >
+          <option value="4:3">4:3 (default)</option>
+          <option value="5:3">5:3</option>
+          <option value="16:9">16:9 (widescreen)</option>
+        </select>
         <br />
         <label for="client_hdviewport_offset">Offset chatbox:</label>
         <input
@@ -964,6 +976,7 @@
           id="client_hdviewport_offset"
           onclick="switchChatOffset()"
         />
+        <br />
         <br />
         <br />
         <label for="client_callwords">Callwords:</label>
@@ -1002,13 +1015,15 @@
           <a href="https://github.com/qubrick">Qubrick</a>.
         </p>
         <p>
-          <a href="https://github.com/AttorneyOnline/webAO"
+          <a href="https://github.com/Trite699/webAO"
             >Follow development on our GitHub</a
           >
         </p>
         <p>Special thanks to Aleks for the first webAO PoC.</p>
         <p><a href="styles/igiari/readme.txt">Igiari font by Caveras</a></p>
-        <p>Fixes by Walter Trite</p>
+        <p>
+          Fixes and Additions by
+          <a href="https://github.com/Trite699">@Walter Trite</a></p>
       </span>
     </div>
   </template>
