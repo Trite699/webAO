@@ -50,6 +50,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "Borginian";
+  src: url("FOT-UDMarugo_LargePr6-M_Borginian.otf");
+  font-weight: normal;
+  font-style: normal;
+}
+
 #client_chatcontainer {
   display: block;
   position: absolute;
@@ -79,7 +86,7 @@
   border-width: 0.2em;
   border-radius: 0.3em;
   z-index: 1;
-  font-family: "Ace Name", "Igiari Cyrillic", "MS PGothic", "MS UI Gothic",
+  font-family: "Borginian", "Ace Name", "Igiari Cyrillic", "MS PGothic", "MS UI Gothic",
     "MS Sans Serif", "Hiragino Maru Gothic Pro", "Mitra Mono", "Mukti Narrow",
     "Meera", "Khmer OS", "FreeSans", "Gargi", sans-serif;
 }
@@ -110,7 +117,7 @@
   text-align: left;
   overflow: hidden;
   scroll-behavior: smooth;
-  font-family: "Igiari Cyrillic", "MS PGothic", "MS UI Gothic", "MS Sans Serif",
+  font-family: "Borginian", "Igiari Cyrillic", "MS PGothic", "MS UI Gothic", "MS Sans Serif",
     "Hiragino Maru Gothic Pro", "Mitra Mono", "Mukti Narrow", "Meera",
     "Khmer OS", "FreeSans", "Gargi", sans-serif;
 }
@@ -133,7 +140,7 @@
 @keyframes idling {
   0% {
     right: 0;
-  }
+  } 
 
   50% {
     right: 2%;
