@@ -61,7 +61,17 @@ export function onEnter(event: KeyboardEvent) {
       const matchingOption = Array.from(roleSelect.options).find(
         (opt) => opt.value.toLowerCase() === myrole,
       );
-      if (matchingOption) roleSelect.value = matchingOption.value;
+      
+      if (matchingOption) {
+        roleSelect.value = matchingOption.value;
+      } else {
+        // Custom position detected! Add it to the dropdown so the UI remembers it.
+        const newOption = document.createElement("option");
+        newOption.value = myrole;
+        newOption.text = `Custom (${myrole})`;
+        roleSelect.add(newOption);
+        roleSelect.value = myrole;
+      }
 
       if (!text) {
         (<HTMLInputElement>document.getElementById("client_inputbox")).value =
