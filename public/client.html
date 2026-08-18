@@ -431,61 +431,46 @@
           </button>
           <br />
           <br />
-          <span id="pairing" style="display: none">
-            <button
-              id="button_toggle_pairing"
-              alt="Pairing"
-              class="client_button"
-              onclick="toggleElement('pairing_settings')"
-            >
-              Pairing
-            </button>
-            <span id="pairing_settings" style="display: none">
-              <label for="pair_select">Pairing partner:</label>
-              <select name="pair_select" id="pair_select">
-                <option value="-1">None</option>
-              </select>
-              <table
-                style="border: none; margin-left: auto; margin-right: auto"
-              >
-                <tr>
-                  <td>
-                    <p>Horizontal offset:</p>
-                  </td>
-                  <td>
-                    <input
-                      type="range"
-                      name="pair_offset"
-                      id="pair_offset"
-                      min="-100"
-                      max="100"
-                      value="0"
-                    />
-                  </td>
-                </tr>
-                <tr id="y_offset" style="display: none">
-                  <td>
-                    <p>Vertical offset:</p>
-                  </td>
-                  <td>
-                    <input
-                      type="range"
-                      name="pair_y_offset"
-                      id="pair_y_offset"
-                      min="-100"
-                      max="100"
-                      value="0"
-                    />
-                  </td>
-                </tr>
-              </table>
-              <input
-                id="pair_reset"
-                type="button"
-                value="Reset"
-                onclick="resetOffset()"
-              />
-            </span>
+     <div class="ic_group">
+                    <div class="ic_group_title">Pairing</div>
+                    <div class="ic_group_body">
+                        <span id="pairing" style="display: none">
+                            <button id="button_toggle_pairing" alt="Pairing" class="client_button" onclick="toggleElement('pairing_settings')">Pairing</button>
+                            <span id="pairing_settings" style="display: none">
+                                <label for="pair_select">Pairing partner:</label>
+                                <select name="pair_select" id="pair_select">
+                                    <option value="-1">None</option>
+                                </select>
+                                <label for="pair_order">Order:</label>
+                                <select name="pair_order" id="pair_order">
+                                    <option value="0">To front</option>
+                                    <option value="1">To behind</option>
+                                </select>
+                                <table style="border: none; margin-left: auto; margin-right: auto">
+                                    <tr>
+                                        <td>
+                                            <p>Horizontal offset:</p>
+                                        </td>
+                                        <td>
+                                            <span class="pair_offset_ctrl">
+                                                <button type="button" class="pair_nudge" data-target="pair_offset" data-step="-1" title="Nudge left">&lsaquo;</button>
+                                                <input type="range" name="pair_offset" id="pair_offset" min="-100" max="100" value="0"/>
+                                                <button type="button" class="pair_nudge" data-target="pair_offset" data-step="1" title="Nudge right">&rsaquo;</button>
+                                                <input type="number" id="pair_offset_num" class="pair_num" min="-100" max="100" step="1" value="0"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr id="y_offset" style="display: none">
+                                        <td>
+                                            <p>Vertical offset:</p>
+                                        </td>
+                                        <td>
+                                            <span class="pair_offset_ctrl">
+                                                <button type="button" class="pair_nudge" data-target="pair_y_offset" data-step="-1" title="Nudge down">&lsaquo;</button>
+                                                <input type="range" name="pair_y_offset" id="pair_y_offset" min="-100" max="100" value="0"/>
+                                                <button type="button" class="pair_nudge" data-target="pair_y_offset" data-step="1" title="Nudge up">&rsaquo;</button>
+                                                <input type="number" id="pair_y_offset_num" class="pair_num" min="-100" max="100" step="1" value="0"/>
+                                            </span>
           </span>
           <br />
           <br />
