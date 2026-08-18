@@ -3,13 +3,16 @@ import { AO_HOST } from "../../client/aoHost";
 import { client } from "../../client";
 import transparentPng from "../../constants/transparentPng";
 import fileExists from "../../utils/fileExists";
-import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset"; // <-- Added import
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+
+// A list of ALL extensions to check locally, since webAO defaults often miss webp/jpg
+const ALL_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
 
 export async function setBackgroundImage(elementid: string, bgname: string, bgpart: string) {
-
   let url;
   let success = false;
-  for (const extension of client.background_extensions) {
+  
+  for (const extension of ALL_EXTS) {
     url = `${AO_HOST}background/${encodeURI(bgname.toLowerCase())}/${bgpart}${extension}`;
     
     // 1. Check local base folder FIRST
@@ -20,17 +23,30 @@ export async function setBackgroundImage(elementid: string, bgname: string, bgpa
       break;
     }
 
-    // 2. Normal server check fallback
-    const exists = await fileExists(url);
-    if (exists) {
-      success = true;
-      break;
+    // 2. Normal server check fallback (Only check server if the extension is supported by standard webAO)
+    if (client.background_extensions.includes(extension)) {
+      const exists = await fileExists(url);
+      if (exists) {
+        success = true;
+        break;
+      }
     }
   }
+
+  // --- CUSTOM POSITION FALLBACK ---
+  // If the background failed to load (e.g., you are on "/pos gallery" and "gallery.png" doesn't exist),
+  // fallback to the witness stand instead of showing a broken transparent screen!
+  if (!success && !["defenseempty", "prosecutorempty", "witnessempty", "helperstand", "judgestand", "jurystand", "seance"].includes(bgpart)) {
+    console.log(`[Background] Couldn't find specific background for custom position "${bgpart}". Falling back to witness stand.`);
+    return setBackgroundImage(elementid, bgname, "witnessempty");
+  }
+  // --------------------------------
+
   if (success)
     (<HTMLImageElement>document.getElementById(elementid)).src = url;
   else
     (<HTMLImageElement>document.getElementById(elementid)).src = transparentPng;
+    
   return success;
 }
 
@@ -51,6 +67,7 @@ export const set_side = async ({
 }) => {
   const view = document.getElementById("client_fullview")!;
   let bench: HTMLImageElement;
+  
   if (["def", "pro", "wit"].includes(position)) {
     bench = <HTMLImageElement>(
       document.getElementById(`client_${position}_bench`)
@@ -92,9 +109,10 @@ export const set_side = async ({
     const bg_folder = client.viewport.getBackgroundFolder();
     const stems = [desk.ao2, desk.ao1].filter((s): s is string => typeof s === "string");
     let found = false;
+    
     outer:
     for (const stem of stems) {
-      for (const ext of client.background_extensions) {
+      for (const ext of ALL_EXTS) {
         let url = `${bg_folder}${stem}${ext}`;
         
         // 1. Check local base folder FIRST for the desk overlay
@@ -107,14 +125,17 @@ export const set_side = async ({
         }
 
         // 2. Normal server check fallback
-        if (await fileExists(url)) {
-          bench.src = url;
-          bench.style.opacity = "1";
-          found = true;
-          break outer;
+        if (client.background_extensions.includes(ext)) {
+          if (await fileExists(url)) {
+            bench.src = url;
+            bench.style.opacity = "1";
+            found = true;
+            break outer;
+          }
         }
       }
     }
+    
     if (!found) {
       bench.src = transparentPng;
     }
