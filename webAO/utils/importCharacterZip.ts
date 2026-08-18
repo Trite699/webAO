@@ -6,77 +6,57 @@ function basename(path: string): string {
   return path.split("/").pop() || path;
 }
 
-/**
- * Shared core: given a zip's raw bytes and a fallback name (used only if
- * the character doesn't declare one in char.ini or via its folder name),
- * extracts char.ini + every other file and stores them locally.
- * Returns the resolved (display) character name.
- */
+// Helper to DRY up MIME type detection for both characters and base folders
+function getMimeType(filename: string): string {
+  if (filename.endsWith(".gif")) return "image/gif";
+  if (filename.endsWith(".webp")) return "image/webp";
+  if (filename.endsWith(".png")) return "image/png";
+  if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) return "image/jpeg";
+  if (filename.endsWith(".opus") || filename.endsWith(".ogg")) return "audio/ogg";
+  if (filename.endsWith(".mp3")) return "audio/mpeg";
+  if (filename.endsWith(".wav")) return "audio/wav";
+  return "application/octet-stream";
+}
+
+// ---------------------------------------------------------
+// CHARACTER IMPORT LOGIC
+// ---------------------------------------------------------
 async function importCharacterZipBlob(
   blob: Blob,
   fallbackName: string,
 ): Promise<string> {
   const zip = await JSZip.loadAsync(blob);
-
   const entries = Object.values(zip.files).filter((f) => !f.dir);
   const iniEntry = entries.find(
     (f) => basename(f.name).toLowerCase() === "char.ini",
   );
   
   if (!iniEntry) {
-    throw new Error(
-      "No char.ini found in this zip -- make sure it's a character folder zipped up directly (not a folder containing the character folder).",
-    );
+    throw new Error("No char.ini found in this zip.");
   }
 
   const iniText = await iniEntry.async("string");
+  const rootDir = iniEntry.name.slice(0, iniEntry.name.length - "char.ini".length);
 
-  // Everything is stored relative to the folder char.ini lives in, since
-  // URL builders elsewhere address files as "<charactername>/<relative
-  // path>" -- e.g. "emotions/button1_off.png", "(a)happy.gif".
-  const rootDir = iniEntry.name.slice(
-    0,
-    iniEntry.name.length - "char.ini".length,
-  );
-
-  // Try to name the character after char.ini's own [Options] name, then
-  // its containing folder in the zip, then the zip's own filename.
   let resolvedName = fallbackName;
   try {
     const parsed = iniParse(iniText);
-    if (parsed?.options?.name) {
-      resolvedName = parsed.options.name;
-    } else {
+    if (parsed?.options?.name) resolvedName = parsed.options.name;
+    else {
       const folder = rootDir.replace(/\/$/, "").split("/").pop();
       if (folder) resolvedName = folder;
     }
-  } catch {
-    // fall back to fallbackName
-  }
+  } catch { /* fallback */ }
 
   const files: Record<string, Blob> = {};
   for (const entry of entries) {
     if (entry === iniEntry) continue;
-    if (!entry.name.startsWith(rootDir)) continue; // ignore stray sibling files
+    if (!entry.name.startsWith(rootDir)) continue;
     const relativePath = entry.name.slice(rootDir.length).toLowerCase();
     if (!relativePath) continue;
 
-    // 1. Get raw binary data instead of a "dumb" blob
-    // eslint-disable-next-line no-await-in-loop
     const rawData = await entry.async("arraybuffer");
-
-    // 2. Assign the correct MIME type based on the file extension
-    let mimeType = "application/octet-stream";
-    if (relativePath.endsWith(".gif")) mimeType = "image/gif";
-    else if (relativePath.endsWith(".webp")) mimeType = "image/webp";
-    else if (relativePath.endsWith(".png")) mimeType = "image/png";
-    else if (relativePath.endsWith(".jpg") || relativePath.endsWith(".jpeg")) mimeType = "image/jpeg";
-    else if (relativePath.endsWith(".opus") || relativePath.endsWith(".ogg")) mimeType = "audio/ogg";
-    else if (relativePath.endsWith(".mp3")) mimeType = "audio/mpeg";
-    else if (relativePath.endsWith(".wav")) mimeType = "audio/wav";
-
-    // 3. Create a smart Blob that tells the browser EXACTLY what it is
-    files[relativePath] = new Blob([rawData], { type: mimeType });
+    files[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
   }
 
   await saveLocalCharacter({
@@ -86,67 +66,90 @@ async function importCharacterZipBlob(
     files,
   });
 
-  // eslint-disable-next-line no-console
-  console.log(
-    `[local character] Imported "${resolvedName}" (stored as "${resolvedName.toLowerCase()}"). ` +
-      `Stored files (${Object.keys(files).length}): ${Object.keys(files).join(", ") || "(none)"}`,
-  );
-
   return resolvedName;
 }
 
-export async function importCharacterZipFile(file: File): Promise<string> {
-  const fallbackName = file.name.replace(/\.zip$/i, "");
-  return importCharacterZipBlob(file, fallbackName);
+// ---------------------------------------------------------
+// BASE FOLDER IMPORT LOGIC
+// ---------------------------------------------------------
+async function importBaseZipBlob(blob: Blob): Promise<string> {
+  const zip = await JSZip.loadAsync(blob);
+  const entries = Object.values(zip.files).filter((f) => !f.dir);
+
+  // Try to find the root by looking for the "sounds/" or "background/" folder
+  let rootDir = "";
+  const sampleEntry = entries.find(e => e.name.toLowerCase().includes("sounds/") || e.name.toLowerCase().includes("background/"));
+  if (sampleEntry) {
+    // Extract whatever folder structure comes BEFORE "sounds/" or "background/"
+    const match = sampleEntry.name.match(/^(.*?)(sounds|background)\//i);
+    if (match) rootDir = match[1];
+  }
+
+  const files: Record<string, Blob> = {};
+  for (const entry of entries) {
+    if (!entry.name.startsWith(rootDir)) continue;
+    const relativePath = entry.name.slice(rootDir.length).toLowerCase();
+    if (!relativePath) continue;
+
+    const rawData = await entry.async("arraybuffer");
+    files[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
+  }
+
+  // Save as a hidden system character named "__base__"
+  await saveLocalCharacter({
+    name: "__base__",
+    displayName: "Local Base Assets",
+    iniText: "", // Base doesn't need an ini
+    files,
+  });
+
+  console.log(`[local base] Imported base folder. Stored files: ${Object.keys(files).length}`);
+  return "Base Folder";
 }
 
-export async function importCharacterZipFromUrl(url: string): Promise<string> {
+// ---------------------------------------------------------
+// EXPORTS (FILE & URL HANDLERS)
+// ---------------------------------------------------------
+export async function importCharacterZipFile(file: File): Promise<string> {
+  return importCharacterZipBlob(file, file.name.replace(/\.zip$/i, ""));
+}
+export async function importBaseZipFile(file: File): Promise<string> {
+  return importBaseZipBlob(file);
+}
+
+export async function importZipFromUrl(url: string, isBase = false): Promise<string> {
   let fetchUrl = url;
 
-  // --- GOOGLE DRIVE INTERCEPTOR ---
-  // If the user pastes a standard GDrive link, extract the ID and force a raw download
   if (url.includes("drive.google.com/file/d/")) {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
-      const fileId = match[1];
-      // Convert to Google's hidden direct download API
-      fetchUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-      console.log("Converted Google Drive link to direct download:", fetchUrl);
+      fetchUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
     }
   }
-  // --------------------------------
 
   let response: Response;
   try {
-    // Attempt 1: Try direct fetch
     response = await fetch(fetchUrl);
   } catch (err) {
-    // Attempt 2: Use CORS Proxy (Google Drive will almost always trigger this)
-    console.warn("Direct fetch failed (likely CORS). Attempting proxy route...");
+    console.warn("Direct fetch failed. Attempting proxy route...");
     try {
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
-      response = await fetch(proxyUrl);
+      response = await fetch(`https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`);
     } catch (proxyErr) {
-      throw new Error(
-        `Couldn't reach that link, even with a proxy bypass. Please download the .zip and upload it manually.`,
-      );
+      throw new Error(`Couldn't reach that link. Please download the .zip manually.`);
     }
   }
 
-  // If we got a response but it's an error code (like 404 or a GDrive large-file warning)
-  if (!response.ok) {
-    throw new Error(`Link returned an error (HTTP ${response.status}). This often happens with GDrive files over ~100MB.`);
-  }
+  if (!response.ok) throw new Error(`Link error (HTTP ${response.status}).`);
   
   const blob = await response.blob();
-  
-  // If the blob is HTML, Google Drive probably blocked it with a virus scan warning
   if (blob.type.includes("text/html")) {
-    throw new Error("Received a webpage instead of a ZIP. If this is a Google Drive link, the file is likely too large for automated download. Please download it manually.");
+    throw new Error("Received a webpage instead of a ZIP (likely a GDrive file size block).");
   }
 
-  const lastSegment = url.split("/").pop()?.split("?")[0] || "character";
-  const fallbackName = lastSegment.replace(/\.zip$/i, "");
-  
-  return importCharacterZipBlob(blob, fallbackName);
+  if (isBase) {
+    return importBaseZipBlob(blob);
+  } else {
+    const fallbackName = (url.split("/").pop()?.split("?")[0] || "character").replace(/\.zip$/i, "");
+    return importCharacterZipBlob(blob, fallbackName);
+  }
 }
