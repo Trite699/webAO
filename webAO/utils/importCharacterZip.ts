@@ -22,6 +22,7 @@ async function importCharacterZipBlob(
   const iniEntry = entries.find(
     (f) => basename(f.name).toLowerCase() === "char.ini",
   );
+  
   if (!iniEntry) {
     throw new Error(
       "No char.ini found in this zip -- make sure it's a character folder zipped up directly (not a folder containing the character folder).",
@@ -100,19 +101,52 @@ export async function importCharacterZipFile(file: File): Promise<string> {
 }
 
 export async function importCharacterZipFromUrl(url: string): Promise<string> {
+  let fetchUrl = url;
+
+  // --- GOOGLE DRIVE INTERCEPTOR ---
+  // If the user pastes a standard GDrive link, extract the ID and force a raw download
+  if (url.includes("drive.google.com/file/d/")) {
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      const fileId = match[1];
+      // Convert to Google's hidden direct download API
+      fetchUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      console.log("Converted Google Drive link to direct download:", fetchUrl);
+    }
+  }
+  // --------------------------------
+
   let response: Response;
   try {
-    response = await fetch(url);
+    // Attempt 1: Try direct fetch
+    response = await fetch(fetchUrl);
   } catch (err) {
-    throw new Error(
-      `Couldn't reach that link. If the host blocks cross-origin requests (CORS), download the .zip and upload it directly instead. (${err})`,
-    );
+    // Attempt 2: Use CORS Proxy (Google Drive will almost always trigger this)
+    console.warn("Direct fetch failed (likely CORS). Attempting proxy route...");
+    try {
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
+      response = await fetch(proxyUrl);
+    } catch (proxyErr) {
+      throw new Error(
+        `Couldn't reach that link, even with a proxy bypass. Please download the .zip and upload it manually.`,
+      );
+    }
   }
+
+  // If we got a response but it's an error code (like 404 or a GDrive large-file warning)
   if (!response.ok) {
-    throw new Error(`Link returned an error (HTTP ${response.status}).`);
+    throw new Error(`Link returned an error (HTTP ${response.status}). This often happens with GDrive files over ~100MB.`);
   }
+  
   const blob = await response.blob();
+  
+  // If the blob is HTML, Google Drive probably blocked it with a virus scan warning
+  if (blob.type.includes("text/html")) {
+    throw new Error("Received a webpage instead of a ZIP. If this is a Google Drive link, the file is likely too large for automated download. Please download it manually.");
+  }
+
   const lastSegment = url.split("/").pop()?.split("?")[0] || "character";
   const fallbackName = lastSegment.replace(/\.zip$/i, "");
+  
   return importCharacterZipBlob(blob, fallbackName);
 }
