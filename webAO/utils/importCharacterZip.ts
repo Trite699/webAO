@@ -1,12 +1,11 @@
 import JSZip from "jszip";
 import iniParse from "../iniParse";
-import { saveLocalCharacter } from "./localCharacterStore";
+import { saveLocalCharacter, getLocalCharacterSync } from "./localCharacterStore";
 
 function basename(path: string): string {
   return path.split("/").pop() || path;
 }
 
-// Helper to DRY up MIME type detection for both characters and base folders
 function getMimeType(filename: string): string {
   if (filename.endsWith(".gif")) return "image/gif";
   if (filename.endsWith(".webp")) return "image/webp";
@@ -18,108 +17,123 @@ function getMimeType(filename: string): string {
   return "application/octet-stream";
 }
 
-// ---------------------------------------------------------
-// CHARACTER IMPORT LOGIC
-// ---------------------------------------------------------
-async function importCharacterZipBlob(
-  blob: Blob,
-  fallbackName: string,
-): Promise<string> {
+/**
+ * THE UNIVERSAL IMPORTER
+ * Scans a ZIP for multiple characters AND base assets simultaneously.
+ */
+async function importUniversalZipBlob(blob: Blob, fallbackName: string): Promise<string> {
   const zip = await JSZip.loadAsync(blob);
   const entries = Object.values(zip.files).filter((f) => !f.dir);
-  const iniEntry = entries.find(
-    (f) => basename(f.name).toLowerCase() === "char.ini",
-  );
+
+  let importedChars = 0;
+  let importedBaseFiles = 0;
+
+  // --- 1. IMPORT MULTIPLE CHARACTERS ---
+  const iniEntries = entries.filter((f) => basename(f.name).toLowerCase() === "char.ini");
   
-  if (!iniEntry) {
-    throw new Error("No char.ini found in this zip.");
-  }
+  for (const iniEntry of iniEntries) {
+    const rootDir = iniEntry.name.slice(0, iniEntry.name.length - "char.ini".length);
+    const iniText = await iniEntry.async("string");
 
-  const iniText = await iniEntry.async("string");
-  const rootDir = iniEntry.name.slice(0, iniEntry.name.length - "char.ini".length);
+    let resolvedName = fallbackName;
+    try {
+      const parsed = iniParse(iniText);
+      if (parsed?.options?.name) resolvedName = parsed.options.name;
+      else {
+        const folder = rootDir.replace(/\/$/, "").split("/").pop();
+        if (folder) resolvedName = folder;
+      }
+    } catch { /* fallback */ }
 
-  let resolvedName = fallbackName;
-  try {
-    const parsed = iniParse(iniText);
-    if (parsed?.options?.name) resolvedName = parsed.options.name;
-    else {
-      const folder = rootDir.replace(/\/$/, "").split("/").pop();
-      if (folder) resolvedName = folder;
+    const charFiles: Record<string, Blob> = {};
+    for (const entry of entries) {
+      if (entry === iniEntry) continue;
+      if (!entry.name.startsWith(rootDir)) continue;
+      const relativePath = entry.name.slice(rootDir.length).toLowerCase();
+      if (!relativePath) continue;
+
+      const rawData = await entry.async("arraybuffer");
+      charFiles[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
     }
-  } catch { /* fallback */ }
 
-  const files: Record<string, Blob> = {};
+    await saveLocalCharacter({
+      name: resolvedName.toLowerCase(),
+      displayName: resolvedName,
+      iniText,
+      files: charFiles,
+    });
+    importedChars++;
+    console.log(`[local character] Imported: ${resolvedName}`);
+  }
+
+  // --- 2. IMPORT BASE ASSETS ---
+  const baseFiles: Record<string, Blob> = {};
+  let baseFound = false;
+
   for (const entry of entries) {
-    if (entry === iniEntry) continue;
-    if (!entry.name.startsWith(rootDir)) continue;
-    const relativePath = entry.name.slice(rootDir.length).toLowerCase();
-    if (!relativePath) continue;
+    const lowerName = entry.name.toLowerCase();
+    
+    // If this file was already imported as part of a character, skip it
+    const belongsToChar = iniEntries.some(ini => 
+      lowerName.startsWith(ini.name.slice(0, -"char.ini".length).toLowerCase())
+    );
+    if (belongsToChar) continue;
 
-    const rawData = await entry.async("arraybuffer");
-    files[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
+    // Check if it's a global asset (sounds, backgrounds, evidence)
+    const match = lowerName.match(/(sounds|background|evidence)\/.*$/i);
+    if (match) {
+      const relativePath = match[0];
+      const rawData = await entry.async("arraybuffer");
+      baseFiles[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
+      baseFound = true;
+      importedBaseFiles++;
+    }
   }
 
-  await saveLocalCharacter({
-    name: resolvedName.toLowerCase(),
-    displayName: resolvedName,
-    iniText,
-    files,
-  });
+  if (baseFound) {
+    // Merge with existing base files so we don't overwrite previous uploads!
+    const existingBase = getLocalCharacterSync("__base__");
+    const mergedFiles = existingBase ? { ...existingBase.files, ...baseFiles } : baseFiles;
 
-  return resolvedName;
-}
-
-// ---------------------------------------------------------
-// BASE FOLDER IMPORT LOGIC
-// ---------------------------------------------------------
-async function importBaseZipBlob(blob: Blob): Promise<string> {
-  const zip = await JSZip.loadAsync(blob);
-  const entries = Object.values(zip.files).filter((f) => !f.dir);
-
-  // Try to find the root by looking for the "sounds/" or "background/" folder
-  let rootDir = "";
-  const sampleEntry = entries.find(e => e.name.toLowerCase().includes("sounds/") || e.name.toLowerCase().includes("background/"));
-  if (sampleEntry) {
-    // Extract whatever folder structure comes BEFORE "sounds/" or "background/"
-    const match = sampleEntry.name.match(/^(.*?)(sounds|background)\//i);
-    if (match) rootDir = match[1];
+    await saveLocalCharacter({
+      name: "__base__",
+      displayName: "Local Base Assets",
+      iniText: "",
+      files: mergedFiles,
+    });
+    console.log(`[local base] Imported ${importedBaseFiles} global assets.`);
   }
 
-  const files: Record<string, Blob> = {};
-  for (const entry of entries) {
-    if (!entry.name.startsWith(rootDir)) continue;
-    const relativePath = entry.name.slice(rootDir.length).toLowerCase();
-    if (!relativePath) continue;
-
-    const rawData = await entry.async("arraybuffer");
-    files[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
+  // Create a nice summary message
+  if (importedChars === 0 && importedBaseFiles === 0) {
+    throw new Error("No characters or base assets (sounds/backgrounds) found in this zip!");
   }
-
-  // Save as a hidden system character named "__base__"
-  await saveLocalCharacter({
-    name: "__base__",
-    displayName: "Local Base Assets",
-    iniText: "", // Base doesn't need an ini
-    files,
-  });
-
-  console.log(`[local base] Imported base folder. Stored files: ${Object.keys(files).length}`);
-  return "Base Folder";
+  
+  if (importedChars > 0 && importedBaseFiles > 0) {
+    return `Imported ${importedChars} character(s) and ${importedBaseFiles} base files!`;
+  } else if (importedChars > 0) {
+    return `Imported ${importedChars} character(s) successfully!`;
+  } else {
+    return `Imported ${importedBaseFiles} base asset(s) successfully!`;
+  }
 }
 
 // ---------------------------------------------------------
 // EXPORTS (FILE & URL HANDLERS)
 // ---------------------------------------------------------
 export async function importCharacterZipFile(file: File): Promise<string> {
-  return importCharacterZipBlob(file, file.name.replace(/\.zip$/i, ""));
+  const fallbackName = file.name.replace(/\.zip$/i, "");
+  return importUniversalZipBlob(file, fallbackName);
 }
+
 export async function importBaseZipFile(file: File): Promise<string> {
-  return importBaseZipBlob(file);
+  return importUniversalZipBlob(file, "Base Folder");
 }
 
 export async function importZipFromUrl(url: string, isBase = false): Promise<string> {
   let fetchUrl = url;
 
+  // Google Drive interceptor
   if (url.includes("drive.google.com/file/d/")) {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
@@ -143,13 +157,9 @@ export async function importZipFromUrl(url: string, isBase = false): Promise<str
   
   const blob = await response.blob();
   if (blob.type.includes("text/html")) {
-    throw new Error("Received a webpage instead of a ZIP (likely a GDrive file size block).");
+    throw new Error("Received a webpage instead of a ZIP (likely a GDrive file size block). Download it manually.");
   }
 
-  if (isBase) {
-    return importBaseZipBlob(blob);
-  } else {
-    const fallbackName = (url.split("/").pop()?.split("?")[0] || "character").replace(/\.zip$/i, "");
-    return importCharacterZipBlob(blob, fallbackName);
-  }
+  const fallbackName = (url.split("/").pop()?.split("?")[0] || "Imported Pack").replace(/\.zip$/i, "");
+  return importUniversalZipBlob(blob, fallbackName);
 }
