@@ -58,27 +58,34 @@ export function onEnter(event: KeyboardEvent) {
       const roleSelect = <HTMLSelectElement>(
         document.getElementById("role_select")
       );
-      const matchingOption = Array.from(roleSelect.options).find(
-        (opt) => opt.value.toLowerCase() === myrole,
-      );
       
-      if (matchingOption) {
-        roleSelect.value = matchingOption.value;
-      } else {
-        // Custom position detected! Add it to the dropdown so the UI remembers it.
-        const newOption = document.createElement("option");
-        newOption.value = myrole;
-        newOption.text = `Custom (${myrole})`;
-        roleSelect.add(newOption);
-        roleSelect.value = myrole;
+      if (roleSelect) {
+        const matchingOption = Array.from(roleSelect.options).find(
+          (opt) => opt.value.toLowerCase() === myrole,
+        );
+        
+        if (matchingOption) {
+          roleSelect.value = matchingOption.value;
+        } else {
+          // Custom position detected! Add it to the dropdown so the UI remembers it.
+          const newOption = document.createElement("option");
+          newOption.value = myrole;
+          newOption.text = `Custom (${myrole})`;
+          roleSelect.appendChild(newOption);
+          roleSelect.value = myrole;
+        }
+
+        // --- THE CRUCIAL LINE ---
+        // This forces the game to visually update your background immediately
+        roleSelect.dispatchEvent(new Event("change"));
       }
 
       if (!text) {
-        (<HTMLInputElement>document.getElementById("client_inputbox")).value =
-          "";
+        (<HTMLInputElement>document.getElementById("client_inputbox")).value = "";
         return false;
       }
     }
+    
     const additive = Boolean(
       (<HTMLInputElement>document.getElementById("check_additive")).checked,
     );
