@@ -23,6 +23,19 @@ export function resolveLocalFile(
   const key = filename.toLowerCase();
   let blob = record.files[key];
 
+  // --- DOUBLE-PREFIX FIX ---
+  // If webAO prepends (a) or (b) to an emote name that ALREADY starts with (a) or (b)
+  // (e.g. requesting "(a)(a)lobster.gif" for an INI entry defined as "(a)lobster"),
+  // strip the extra wrapper and look up the real file "(a)lobster.gif".
+  if (!blob) {
+    const doublePrefixMatch = /^(\(a\)|\(b\))(\(a\)|\(b\))(.+)$/.exec(key);
+    if (doublePrefixMatch) {
+      const actualFile = `${doublePrefixMatch[2]}${doublePrefixMatch[3]}`;
+      blob = record.files[actualFile];
+    }
+  }
+  // -------------------------
+
   if (!blob) {
     // webAO's URL builders always construct "(a)"/"(b)" as a filename
     // PREFIX (e.g. "(a)normal.webp"), but some character packs (Case
@@ -96,7 +109,8 @@ export function getLocalOverrideUrl(url: string): string | null {
       // Extract the path from "sounds/..." or "background/..." onwards
       const match = url.match(/(sounds|background|evidence)\/.*$/i);
       if (match) {
-        const relativePath = match[0].toLowerCase();
+        const rawPath = match[0].split("?")[0];
+        const relativePath = decodeURIComponent(rawPath).toLowerCase();
         const fileBlob = baseRecord.files[relativePath];
         if (fileBlob) {
           const cacheKey = `__base__::${relativePath}`;
@@ -116,8 +130,6 @@ export function getLocalOverrideUrl(url: string): string | null {
   const record = getLocalCharacterSync(parsed.charactername);
   if (!record) return null; // not a locally-imported character -- fall through silently
 
-  // Notice the console.warn() is entirely gone! It will now fail silently 
-  // and instantly move on to check the next file extension.
   const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
   
   return resolved;
