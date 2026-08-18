@@ -1,146 +1,140 @@
-import { getLocalCharacterSync } from "./localCharacterStore";
+import { client } from "../../client";
+import fileExists from "../../utils/fileExists";
+import { updateActionCommands } from "../../dom/updateActionCommands";
+import { pickEmotion } from "../../dom/pickEmotion";
+import { AO_HOST } from "../../client/aoHost";
+import { ensureCharIni } from "../../client/handleCharacterInfo";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { loadSoundList } from "../../client/loadSoundList";
 
-// Object URLs are cheap to create but should be created once per blob and
-// reused, rather than minted fresh (and leaked) on every lookup.
-const blobUrlCache = new Map<string, string>();
-
-export function isLocalCharacterName(charactername: string): boolean {
-  return !!getLocalCharacterSync(charactername);
+function addEmoteButton(i: number, imgurl: string, desc: string) {
+  const emotesList = document.getElementById("client_emo");
+  const emote_item = new Image();
+  emote_item.id = "emo_" + i;
+  emote_item.className = "emote_button";
+  emote_item.src = getLocalOverrideUrl(imgurl) ?? imgurl;
+  emote_item.alt = desc;
+  emote_item.title = desc;
+  emote_item.onclick = () => {
+    window.pickEmotion(i);
+  };
+  emotesList.appendChild(emote_item);
 }
 
 /**
- * Looks up a single file within a locally-imported character by filename
- * (e.g. "(a)happy.gif", "char_icon.png"), returning a cached blob object
- * URL, or null if that character/file isn't stored locally.
+ * Handles the server's assignment of a character for the player to use.
+ * PV # playerID (unused) # CID # character ID
+ * @param {Array} args packet arguments
  */
-export function resolveLocalFile(
-  charactername: string,
-  filename: string,
-): string | null {
-  const record = getLocalCharacterSync(charactername);
-  if (!record) return null;
+export const handlePV = async (args: string[]) => {
+  client.charID = Number(args[3]);
+  document.getElementById("client_waiting")!.style.display = "none";
+  document.getElementById("client_charselect")!.style.display = "none";
 
-  const key = filename.toLowerCase();
-  let blob = record.files[key];
-
-  // --- DOUBLE-PREFIX FIX ---
-  // If webAO prepends (a) or (b) to an emote name that ALREADY starts with (a) or (b)
-  // (e.g. requesting "(a)(a)lobster.gif" for an INI entry defined as "(a)lobster"),
-  // strip the extra wrapper and look up the real file "(a)lobster.gif".
-  if (!blob) {
-    const doublePrefixMatch = /^(\(a\)|\(b\))(\(a\)|\(b\))(.+)$/.exec(key);
-    if (doublePrefixMatch) {
-      const actualFile = `${doublePrefixMatch[2]}${doublePrefixMatch[3]}`;
-      blob = record.files[actualFile];
+  const me = client.chars[client.charID];
+  client.selectedEmote = -1;
+  const { emotes } = client;
+  const emotesList = document.getElementById("client_emo");
+  emotesList.style.display = "";
+  emotesList.innerHTML = ""; // Clear emote box
+  const ini = await ensureCharIni(client.charID);
+  loadSoundList(me.name);
+  me.side = ini.options.side;
+  updateActionCommands(me.side);
+  if (ini.emotions.number === 0) {
+    emotesList.innerHTML = `<span
+					id="emo_0"
+					alt="unavailable"
+					class="emote_button">No emotes available</span>`;
+  } else {
+    // Probe extensions once using button1_off, then reuse for all emotes
+    const charPath = `${AO_HOST}characters/${encodeURI(me.name.toLowerCase())}/emotions/`;
+    let emoteExtension = client.emotions_extensions[0];
+    for (const extension of client.emotions_extensions) {
+      if (await fileExists(`${charPath}button1_off${extension}`)) {
+        emoteExtension = extension;
+        break;
+      }
     }
-  }
-  // -------------------------
 
-  if (!blob) {
-    // webAO's URL builders always construct "(a)"/"(b)" as a filename
-    // PREFIX (e.g. "(a)normal.webp"), but some character packs (Case
-    // Cafe/KFO-style) instead organize idle/talking sprites into "(a)/"
-    // and "(b)/" SUBFOLDERS (e.g. "(a)/normal.webp"). Retry with a folder
-    // separator inserted after the prefix before giving up.
-    const prefixMatch = /^(\(a\)|\(b\))(.+)$/.exec(key);
-    if (prefixMatch) {
-      blob = record.files[`${prefixMatch[1]}/${prefixMatch[2]}`];
-    }
-  }
-
-  // --- PREANIMATION FIX ---
-  // If the file STILL isn't found, check if it's hiding inside an "anim/" subfolder
-  if (!blob) {
-    blob = record.files[`anim/${key}`];
-  }
-  
-  if (!blob) {
-    const prefixMatch = /^(\(a\)|\(b\))(.+)$/.exec(key);
-    if (prefixMatch) {
-      blob = record.files[`anim/${prefixMatch[2]}`];
-    }
-  }
-  // ------------------------
-
-  if (!blob) return null;
-
-  const cacheKey = `${record.name}::${key}`;
-  const cached = blobUrlCache.get(cacheKey);
-  if (cached) return cached;
-
-  const url = URL.createObjectURL(blob);
-  blobUrlCache.set(cacheKey, url);
-  return url;
-}
-
-/**
- * Every URL builder in webAO follows the same
- * "<host>characters/<name>/<filename>" shape (see setEmote.ts,
- * preloadMessageAssets.ts, handleCharacterInfo.ts). Parsing it back out
- * lets a single interception point (fileExists.ts) cover every caller
- * without each of them needing to know about local characters directly.
- */
-export function parseCharacterAssetUrl(
-  url: string,
-): { charactername: string; filename: string } | null {
-  const match = /characters\/([^/]+)\/(.+)$/.exec(url);
-  if (!match) return null;
-  try {
-    return {
-      charactername: decodeURIComponent(match[1]),
-      filename: decodeURIComponent(match[2]),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Given a URL webAO would normally fetch over the network, returns a local
- * blob URL to use instead if it resolves to a locally-imported character's
- * file, or null if it should fall through to the normal network path.
- */
-export function getLocalOverrideUrl(url: string): string | null {
-  // --- BASE FOLDER INTERCEPTOR ---
-  // Catch requests for global sounds, backgrounds, and evidence
-  if (url.includes("/background/") || url.includes("/sounds/") || url.includes("/evidence/")) {
-    const baseRecord = getLocalCharacterSync("__base__");
-    if (baseRecord) {
-      const match = url.match(/(sounds|background|evidence)\/.*$/i);
-      if (match) {
-        const rawPath = match[0].split("?")[0];
-        const relativePath = decodeURIComponent(rawPath).toLowerCase();
-        const fileBlob = baseRecord.files[relativePath];
-        if (fileBlob) {
-          const cacheKey = `__base__::${relativePath}`;
-          if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey)!;
-          const blobUrl = URL.createObjectURL(fileBlob);
-          blobUrlCache.set(cacheKey, blobUrl);
-          return blobUrl;
+    for (let i = 1; i <= ini.emotions.number; i++) {
+      try {
+        // FIX: Trim every element to remove invisible \r carriage returns
+        const emoteinfo = ini.emotions[i].split("#").map(str => str.trim());
+        if (emoteinfo[4] === undefined || emoteinfo[4] === "") {
+          emoteinfo[4] = "1";
         }
+        let esfx;
+        let esfxd;
+        try {
+          esfx = ini.soundn?.[i]?.trim() || "0";
+          esfxd = ini.soundt?.[i] ? Number(ini.soundt[i].trim()) : 0;
+        } catch (e) {
+          esfx = "0";
+          esfxd = 0;
+        }
+
+        const url = `${charPath}button${i}_off${emoteExtension}`;
+        
+        // Preserve case and keep explicit INI formatting like (a)lobster
+        const preanimName = emoteinfo[1];
+        const animName = emoteinfo[2];
+
+        // Per-frame effects live in char.ini as one section per animation,
+        // e.g. "[guitarpound_FrameSFX]" with "53 = sfx-deskslam". iniParse
+        // lowercases both section and key names, so section lookups here
+        // must be lowercase too. There's one section per phase: preanim
+        // uses the preanim sprite's section, talking/idle both use the
+        // "emote" sprite's section (AO2 char.ini has no separate idle name).
+        const packPhases = (suffix: string): string => {
+          const sections = [preanimName.toLowerCase(), animName.toLowerCase(), animName.toLowerCase()].map(
+            (name) => ini[`${name}_${suffix}`],
+          );
+          const parts = sections.map((sec) => {
+            if (!sec) return "";
+            return Object.entries(sec)
+              .map(([frame, val]) => `${frame}=${val}`)
+              .join("|");
+          });
+          // Leading "|" before each phase's data: frameEffects.ts's
+          // splitPhases() skips index 0 after splitting on "|", so an
+          // empty first segment is intentional, not a placeholder to fill.
+          return parts.every((p) => p === "")
+            ? ""
+            : `${parts.map((p) => `|${p}`).join("^")}^`;
+        };
+
+        emotes[i] = {
+          desc: emoteinfo[0].toLowerCase(),
+          preanim: preanimName,
+          emote: animName,
+          zoom: Number(emoteinfo[3]) || 0,
+          deskmod: Number(emoteinfo[4]),
+          sfx: esfx.toLowerCase(),
+          sfxdelay: esfxd,
+          frame_screenshake: packPhases("framescreenshake"),
+          frame_realization: packPhases("framerealization"),
+          frame_sfx: packPhases("framesfx"),
+          button: url,
+        };
+
+        addEmoteButton(i, url, emotes[i].desc);
+
+        if (i === 1) pickEmotion(1);
+      } catch (e) {
+        console.error(`missing emote ${i}`);
       }
     }
   }
-  // -------------------------------
 
-  const parsed = parseCharacterAssetUrl(url);
-  if (!parsed) return null;
-
-  const record = getLocalCharacterSync(parsed.charactername);
-  if (!record) return null; // not a locally-imported character -- fall through silently
-
-  const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
-  return resolved;
-}
-
-/** Tries each icon extension in order against a local character's files. */
-export function getLocalIconUrl(
-  charactername: string,
-  iconExtensions: string[],
-): string | null {
-  for (const ext of iconExtensions) {
-    const url = resolveLocalFile(charactername, `char_icon${ext}`);
-    if (url) return url;
+  if (
+    await fileExists(
+      `${AO_HOST}characters/${encodeURI(me.name.toLowerCase())}/custom.gif`,
+    )
+  ) {
+    document.getElementById("button_4")!.style.display = "";
+  } else {
+    document.getElementById("button_4")!.style.display = "none";
   }
-  return null;
-}
+
+};
