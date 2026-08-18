@@ -3,6 +3,7 @@ import { AO_HOST } from "../../client/aoHost";
 import { client } from "../../client";
 import transparentPng from "../../constants/transparentPng";
 import fileExists from "../../utils/fileExists";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset"; // <-- Added import
 
 export async function setBackgroundImage(elementid: string, bgname: string, bgpart: string) {
 
@@ -10,8 +11,17 @@ export async function setBackgroundImage(elementid: string, bgname: string, bgpa
   let success = false;
   for (const extension of client.background_extensions) {
     url = `${AO_HOST}background/${encodeURI(bgname.toLowerCase())}/${bgpart}${extension}`;
-    const exists = await fileExists(url);
+    
+    // 1. Check local base folder FIRST
+    const localUrl = getLocalOverrideUrl(url);
+    if (localUrl) {
+      url = localUrl;
+      success = true;
+      break;
+    }
 
+    // 2. Normal server check fallback
+    const exists = await fileExists(url);
     if (exists) {
       success = true;
       break;
@@ -23,7 +33,6 @@ export async function setBackgroundImage(elementid: string, bgname: string, bgpa
     (<HTMLImageElement>document.getElementById(elementid)).src = transparentPng;
   return success;
 }
-
 
 /**
  * Changes the viewport background based on a given position.
@@ -86,7 +95,18 @@ export const set_side = async ({
     outer:
     for (const stem of stems) {
       for (const ext of client.background_extensions) {
-        const url = `${bg_folder}${stem}${ext}`;
+        let url = `${bg_folder}${stem}${ext}`;
+        
+        // 1. Check local base folder FIRST for the desk overlay
+        const localUrl = getLocalOverrideUrl(url);
+        if (localUrl) {
+          bench.src = localUrl;
+          bench.style.opacity = "1";
+          found = true;
+          break outer;
+        }
+
+        // 2. Normal server check fallback
         if (await fileExists(url)) {
           bench.src = url;
           bench.style.opacity = "1";
@@ -118,6 +138,6 @@ export const set_side = async ({
     }
   } else {
     view.style.display = "none";
-    document.getElementById("client_classicview").style.display = "";
+    document.getElementById("client_classicview")!.style.display = "";
   }
 };
