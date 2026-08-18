@@ -35,6 +35,20 @@ export function resolveLocalFile(
     }
   }
 
+  // If the file STILL isn't found, check if it's hiding inside an "anim/" subfolder
+  if (!blob) {
+    blob = record.files[`anim/${key}`];
+  }
+  
+  // Sometimes webAO fucks shit up
+  if (!blob) {
+    const prefixMatch = /^(\(a\)|\(b\))(.+)$/.exec(key);
+    if (prefixMatch) {
+      blob = record.files[`anim/${prefixMatch[2]}`];
+    }
+  }
+  // ------------------------
+
   if (!blob) return null;
 
   const cacheKey = `${record.name}::${key}`;
@@ -74,25 +88,38 @@ export function parseCharacterAssetUrl(
  * file, or null if it should fall through to the normal network path.
  */
 export function getLocalOverrideUrl(url: string): string | null {
+  // --- BASE FOLDER INTERCEPTOR ---
+  // Catch requests for global sounds, backgrounds, and evidence
+  if (url.includes("/background/") || url.includes("/sounds/") || url.includes("/evidence/")) {
+    const baseRecord = getLocalCharacterSync("__base__");
+    if (baseRecord) {
+      // Extract the path from "sounds/..." or "background/..." onwards
+      const match = url.match(/(sounds|background|evidence)\/.*$/i);
+      if (match) {
+        const relativePath = match[0].toLowerCase();
+        const fileBlob = baseRecord.files[relativePath];
+        if (fileBlob) {
+          const cacheKey = `__base__::${relativePath}`;
+          if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey)!;
+          const blobUrl = URL.createObjectURL(fileBlob);
+          blobUrlCache.set(cacheKey, blobUrl);
+          return blobUrl;
+        }
+      }
+    }
+  }
+  // -------------------------------
+
   const parsed = parseCharacterAssetUrl(url);
   if (!parsed) return null;
 
   const record = getLocalCharacterSync(parsed.charactername);
   if (!record) return null; // not a locally-imported character -- fall through silently
 
+  // Notice the console.warn() is entirely gone! It will now fail silently 
+  // and instantly move on to check the next file extension.
   const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
-  if (!resolved) {
-    // The character IS local, but this specific file isn't in its files
-    // map -- almost always a filename/casing mismatch between what the
-    // char.ini/pose expects and what's actually in the zip. Logging this
-    // (rather than just falling through) makes that mismatch visible
-    // instead of silently hitting the network and looking like local
-    // characters "don't work" for no obvious reason.
-    console.warn(
-      `[local character] "${record.displayName}" is loaded locally, but "${parsed.filename}" wasn't found in it. ` +
-        `Falling back to network. Files actually stored for this character: ${Object.keys(record.files).join(", ") || "(none)"}`,
-    );
-  }
+  
   return resolved;
 }
 
