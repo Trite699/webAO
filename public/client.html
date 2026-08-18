@@ -40,10 +40,10 @@
         style-src-elem 'self' 'unsafe-inline' https://golden-layout.com;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hcaptcha.com https://*.hcaptcha.com;
         style-src 'self' 'unsafe-inline' https://golden-layout.com https://hcaptcha.com https://*.hcaptcha.com;
-        img-src 'self' data: file: *;
+        img-src 'self' data: file: blob: *;
         frame-src https://hcaptcha.com https://*.hcaptcha.com;
         connect-src 'self' ws: file: * https://hcaptcha.com https://*.hcaptcha.com;
-        media-src 'self' file: *;"
+        media-src 'self' file: blob: *;"
     />
 
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
