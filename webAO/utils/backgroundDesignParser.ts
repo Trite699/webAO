@@ -1,15 +1,40 @@
 import { getLocalCharacterSync } from "./localCharacterStore";
+import { AO_HOST } from "../../client/aoHost";
 
 export async function getBackgroundDesignIni(bgname: string): Promise<Record<string, any> | null> {
+  const normalizedBg = bgname.toLowerCase();
+  let text = "";
+
+  // 1. Try checking the local imported base pack first
   const baseRecord = getLocalCharacterSync("__base__");
-  if (!baseRecord) return null;
+  if (baseRecord) {
+    const targetKey = `background/${normalizedBg}/design.ini`;
+    const fileBlob = baseRecord.files[targetKey];
+    if (fileBlob) {
+      try {
+        text = await fileBlob.text();
+      } catch (e) {
+        console.error("Failed to read local design.ini blob", e);
+      }
+    }
+  }
 
-  const targetKey = `background/${bgname.toLowerCase()}/design.ini`;
-  const fileBlob = baseRecord.files[targetKey];
-  if (!fileBlob) return null;
+  // 2. Fallback: If not found locally, try fetching it from the live server via HTTP
+  if (!text) {
+    try {
+      const response = await fetch(`${AO_HOST}background/${encodeURI(normalizedBg)}/design.ini`);
+      if (response.ok) {
+        text = await response.text();
+      }
+    } catch {
+      // Server fetch failed or design.ini doesn't exist remotely -- ignore silently
+    }
+  }
 
+  if (!text) return null;
+
+  // 3. Parse the INI file content
   try {
-    const text = await fileBlob.text();
     const lines = text.split(/\r?\n/);
     const result: Record<string, any> = {};
     let currentSection = "global";
