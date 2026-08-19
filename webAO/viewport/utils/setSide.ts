@@ -4,6 +4,7 @@ import { client } from "../../client";
 import transparentPng from "../../constants/transparentPng";
 import fileExists from "../../utils/fileExists";
 import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { getBackgroundDesignIni } from "../utils/backgroundDesignParser";
 
 // A list of ALL extensions to check locally, since webAO defaults often miss webp/jpg
 const ALL_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -66,6 +67,21 @@ export const set_side = async ({
   showDesk: boolean;
 }) => {
   const view = document.getElementById("client_fullview")!;
+  const bgName = client.viewport.getBackgroundName();
+
+  // --- DESIGN.INI PARSER INTEGRATION ---
+  // Read positions and custom origins (like lob) from design.ini if available
+  const designIni = await getBackgroundDesignIni(bgName);
+  let customOrigin: number | null = null;
+
+  if (designIni) {
+    const courtSection = designIni[`court:${position.toLowerCase()}`];
+    if (courtSection && courtSection.origin !== undefined) {
+      customOrigin = Number(courtSection.origin);
+    }
+  }
+  // -------------------------------------
+
   let bench: HTMLImageElement;
   
   if (["def", "pro", "wit"].includes(position)) {
@@ -89,11 +105,12 @@ export const set_side = async ({
   let desk;
   let speedLines;
 
-  if ("def,pro,hld,hlp,wit,jud,jur,sea".includes(position)) {
+  if (positions[position]) {
     bg = positions[position].bg;
     desk = positions[position].desk;
     speedLines = positions[position].speedLines;
   } else {
+    // Custom position fallback (e.g., "lob" position from design.ini)
     bg = `${position}`;
     desk = { ao2: `${position}_overlay`, ao1: "_overlay" };
     speedLines = "defense_speedlines.gif";
@@ -102,7 +119,7 @@ export const set_side = async ({
   if (showSpeedLines === true) {
     court.src = `${AO_HOST}themes/default/${encodeURI(speedLines)}`;
   } else {
-    setBackgroundImage(court.id, client.viewport.getBackgroundName(), bg);
+    setBackgroundImage(court.id, bgName, bg);
   }
 
   if (showDesk === true && desk) {
@@ -143,7 +160,12 @@ export const set_side = async ({
     bench.style.opacity = "0";
   }
 
-  if ("def,pro,wit".includes(position)) {
+  // --- VIEWPORT SHIFT LOGIC (Supports custom design.ini origins!) ---
+  if (customOrigin !== null) {
+    view.style.display = "";
+    document.getElementById("client_classicview")!.style.display = "none";
+    view.style.left = `-${customOrigin}px`;
+  } else if (["def", "pro", "wit"].includes(position)) {
     view.style.display = "";
     document.getElementById("client_classicview")!.style.display = "none";
     switch (position) {
