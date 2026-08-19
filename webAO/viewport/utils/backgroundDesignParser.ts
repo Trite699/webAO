@@ -1,17 +1,15 @@
-import { getLocalCharacterSync } from "./resolveLocalAsset";
-// Simple ini parser if you have one, or a lightweight parser:
+import { getLocalCharacterSync } from "./localCharacterStore";
+
 export async function getBackgroundDesignIni(bgname: string): Promise<Record<string, any> | null> {
   const baseRecord = getLocalCharacterSync("__base__");
   if (!baseRecord) return null;
 
-  // Look for design.ini inside the specific background folder or root base folder
   const targetKey = `background/${bgname.toLowerCase()}/design.ini`;
   const fileBlob = baseRecord.files[targetKey];
   if (!fileBlob) return null;
 
   try {
     const text = await fileBlob.text();
-    // Parse INI format manually or using your project's existing ini parser
     const lines = text.split(/\r?\n/);
     const result: Record<string, any> = {};
     let currentSection = "global";
