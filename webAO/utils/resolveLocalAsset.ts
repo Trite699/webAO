@@ -101,17 +101,33 @@ export function parseCharacterAssetUrl(
  * file, or null if it should fall through to the normal network path.
  */
 export function getLocalOverrideUrl(url: string): string | null {
-  // --- BASE FOLDER INTERCEPTOR ---
+  // --- BASE FOLDER INTERCEPTOR (Flexible Subfolder Support) ---
   // Catch requests for global sounds, backgrounds, and evidence
   if (url.includes("/background/") || url.includes("/sounds/") || url.includes("/evidence/")) {
     const baseRecord = getLocalCharacterSync("__base__");
     if (baseRecord) {
-      // Extract the path from "sounds/..." or "background/..." onwards
       const match = url.match(/(sounds|background|evidence)\/.*$/i);
       if (match) {
         const rawPath = match[0].split("?")[0];
         const relativePath = decodeURIComponent(rawPath).toLowerCase();
-        const fileBlob = baseRecord.files[relativePath];
+        
+        // 1. Try exact path match first
+        let fileBlob = baseRecord.files[relativePath];
+
+        // 2. Flexible Fallback: If it's buried in a custom subfolder (e.g. inside an "sfx/" or custom folder),
+        // scan all files in the zip for a matching filename at the end!
+        if (!fileBlob) {
+          const targetFilename = relativePath.split("/").pop();
+          if (targetFilename) {
+            for (const [key, blob] of Object.entries(baseRecord.files)) {
+              if (key.toLowerCase().endsWith("/" + targetFilename) || key.toLowerCase() === targetFilename) {
+                fileBlob = blob;
+                break;
+              }
+            }
+          }
+        }
+
         if (fileBlob) {
           const cacheKey = `__base__::${relativePath}`;
           if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey)!;
@@ -122,7 +138,7 @@ export function getLocalOverrideUrl(url: string): string | null {
       }
     }
   }
-  // -------------------------------
+  // -------------------------------------------------------------
 
   const parsed = parseCharacterAssetUrl(url);
   if (!parsed) return null;
