@@ -18,3 +18,5 @@ Link to the client in this repo: <http://web.aceattorneyonline.com/>
 
 `docker build -t webao .`
 `docker run -d -it -p 8080:8080 webao`
+## Credits
+The char.ini and sprite parsing were improved using Claude, some of the baseline code is taken from webCOA.
