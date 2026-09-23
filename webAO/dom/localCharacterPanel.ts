@@ -6,7 +6,7 @@ import {
 } from "../utils/localCharacterStore";
 import {
   importCharacterZipFile,
-  importCharacterZipFromUrl,
+  importZipFromUrl, // <-- Changed this import
 } from "../utils/importCharacterZip";
 
 function setStatus(message: string, isError: boolean): void {
@@ -60,7 +60,7 @@ export async function importLocalCharacterZip(): Promise<void> {
   try {
     const name = file
       ? await importCharacterZipFile(file)
-      : await importCharacterZipFromUrl(url!);
+      : await importZipFromUrl(url!); // <-- Changed the function call here
     setStatus(`Imported "${name}".`, false);
     if (fileInput) fileInput.value = "";
     if (urlInput) urlInput.value = "";
