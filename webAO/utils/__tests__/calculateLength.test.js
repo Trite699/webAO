@@ -25,7 +25,7 @@ const download = (url) =>
 describe("animation length calculators", () => {
   it("calculates the APNG length", async () => {
     const animation = await download(
-      "https://attorneyoffline.de/newvanillabase/characters/judge/%28a%29normal.apng",
+      "https://attorneyoffline.de/newvanillabase/characters/judge/%28a%29normal.png",
     );
 
     expect(calculateApngLength(animation)).toBeCloseTo(3760);
