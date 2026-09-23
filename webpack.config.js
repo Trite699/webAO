@@ -68,7 +68,7 @@ module.exports = {
         loader: "esbuild-loader",
         options: { loader: "ts" }
       },
-      // All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
+      // all output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
       { test: /\.js$/, loader: "source-map-loader" },
     ],
   },
@@ -87,7 +87,13 @@ module.exports = {
       patterns: [
         { from: path.resolve(__dirname, "webAO", "styles"), to: "styles" },
         { from: path.resolve(__dirname, "static") },
-        { from: path.resolve(__dirname, "webAO", "golden"), to: "golden" },
+        { 
+          from: path.resolve(__dirname, "webAO", "golden"), 
+          to: "golden",
+          globOptions: {
+            ignore: ["**/*.map"], // <-- Added this to ignore pre-existing source maps
+          },
+        },
         { from: path.resolve(__dirname, "webAO", "lib"), to: "lib" },
       ],
     }),
