@@ -11,6 +11,7 @@
  */
 import { AO_HOST } from "../../client/aoHost";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
 
 type FrameMap = Map<number, string>;
 
@@ -149,14 +150,22 @@ function playFrameSfx(name: string): void {
   // resumes, which sounds like doubled effects.
   if (typeof document !== "undefined" && document.hidden) return;
   const base = `${AO_HOST}sounds/general/${encodeURI(name.toLowerCase())}`;
-  const a = new Audio(`${base}.opus`);
+  // Resolve through the locally-imported base assets first, the same way the
+  // emote SFX path does (resolveAndPreloadAudio). Without this, a sound that
+  // only exists in a local base folder 404s on the network URL and the frame
+  // SFX is silent.
+  const sourceFor = (ext: string): string => {
+    const url = `${base}${ext}`;
+    return getLocalOverrideUrl(url) ?? url;
+  };
+  const a = new Audio(sourceFor(".opus"));
   // Respect the SFX volume setting (the main SFX audio element holds it).
   const sfxAudio = document.getElementById("client_sfxaudio") as HTMLAudioElement | null;
   a.volume = sfxAudio ? sfxAudio.volume : 1;
   a.addEventListener(
     "error",
     () => {
-      a.src = `${base}.wav`;
+      a.src = sourceFor(".wav");
       a.play().catch(() => {});
     },
     { once: true },
