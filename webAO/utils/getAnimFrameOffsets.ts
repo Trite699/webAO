@@ -1,6 +1,11 @@
 /* eslint no-bitwise: "off" */
 import fileExists from "./fileExists";
 import { requestBuffer } from "../services/request";
+import {
+  getLocalOverrideUrl,
+  parseCharacterAssetUrl,
+  isLocalCharacterName,
+} from "./resolveLocalAsset";
 
 /**
  * Extracts the per-frame timing of an animated image so callers can fire
@@ -102,11 +107,42 @@ const cache: { [url: string]: FrameTiming } = {};
 export async function getAnimFrameOffsets(urlNoExt: string): Promise<FrameTiming> {
   if (cache[urlNoExt]) return cache[urlNoExt];
   const empty: FrameTiming = { offsets: [0], total: 0 };
+
+  const parsed = parseCharacterAssetUrl(urlNoExt);
+
+  // Locally-imported character: resolve entirely from local storage, same
+  // as getAnimLength.js -- never touch the network. Previously this
+  // always fell through to fileExists()/requestBuffer() on the raw
+  // network URL regardless of whether a local override existed, which
+  // both wasted a network round trip per extension AND, worse, fetched
+  // the WRONG (network) bytes even on the extension fileExists() had
+  // just confirmed only exists locally -- silently breaking frame-synced
+  // SFX/screenshake/flash timing for local characters.
+  if (parsed && isLocalCharacterName(parsed.charactername)) {
+    for (const ext of [".gif", ".apng", ".webp"]) {
+      const resolvedUrl = getLocalOverrideUrl(`${urlNoExt}${ext}`);
+      if (resolvedUrl) {
+        try {
+          const buf = await requestBuffer(resolvedUrl);
+          const delays = extractors[ext](new Uint8Array(buf));
+          const timing = delays.length ? fromDelays(delays) : empty;
+          cache[urlNoExt] = timing;
+          return timing;
+        } catch {
+          /* try next extension */
+        }
+      }
+    }
+    cache[urlNoExt] = empty;
+    return empty;
+  }
+
   for (const ext of [".webp", ".apng", ".gif"]) {
     const url = urlNoExt + ext;
     try {
       if (await fileExists(url)) {
-        const buf = await requestBuffer(url);
+        const resolvedUrl = getLocalOverrideUrl(url) || url;
+        const buf = await requestBuffer(resolvedUrl);
         const delays = extractors[ext](new Uint8Array(buf));
         const timing = delays.length ? fromDelays(delays) : empty;
         cache[urlNoExt] = timing;
