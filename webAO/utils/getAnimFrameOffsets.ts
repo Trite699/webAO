@@ -101,12 +101,66 @@ const extractors: { [ext: string]: (d: Uint8Array) => number[] } = {
 const cache: { [url: string]: FrameTiming } = {};
 
 /**
+ * Picks the delay extractor from a file's magic bytes. Used for already
+ * resolved object URLs, which carry no file extension to probe.
+ */
+function extractorFromHeader(d: Uint8Array): ((d: Uint8Array) => number[]) | null {
+  // GIF: "GIF87a" / "GIF89a"
+  if (d.length >= 3 && d[0] === 0x47 && d[1] === 0x49 && d[2] === 0x46) {
+    return gifDelays;
+  }
+  // WebP: "RIFF" .... "WEBP"
+  if (
+    d.length >= 12 &&
+    d[0] === 0x52 && d[1] === 0x49 && d[2] === 0x46 && d[3] === 0x46 &&
+    d[8] === 0x57 && d[9] === 0x45 && d[10] === 0x42 && d[11] === 0x50
+  ) {
+    return webpDelays;
+  }
+  // PNG signature (APNG is a PNG with fcTL chunks)
+  if (d.length >= 4 && d[0] === 0x89 && d[1] === 0x50 && d[2] === 0x4e && d[3] === 0x47) {
+    return apngDelays;
+  }
+  return null;
+}
+
+/**
+ * Frame timing for an already-resolved object URL (a local character's
+ * sprite). Reads the bytes straight from the blob and detects the format
+ * from the header. A failure returns empty timing WITHOUT caching it, so a
+ * transient error can't permanently hide the timing for the session.
+ */
+async function getFrameTimingFromBlobUrl(blobUrl: string): Promise<FrameTiming> {
+  if (cache[blobUrl]) return cache[blobUrl];
+  const empty: FrameTiming = { offsets: [0], total: 0 };
+  try {
+    const bytes = new Uint8Array(await requestBuffer(blobUrl));
+    const extract = extractorFromHeader(bytes);
+    const delays = extract ? extract(bytes) : [];
+    const timing = delays.length ? fromDelays(delays) : empty;
+    cache[blobUrl] = timing;
+    return timing;
+  } catch {
+    return empty;
+  }
+}
+
+/**
  * Resolves the frame timing for an asset given WITHOUT extension (probing
  * gif/webp/apng), matching how preanim/sprite URLs are stored. Cached.
  */
 export async function getAnimFrameOffsets(urlNoExt: string): Promise<FrameTiming> {
   if (cache[urlNoExt]) return cache[urlNoExt];
   const empty: FrameTiming = { offsets: [0], total: 0 };
+
+  // Already-resolved local sprite. preloadMessageAssets hands the viewport
+  // the final blob: object URL for local characters. That URL has no file
+  // extension and no "characters/<name>/" shape, so neither the local
+  // branch nor the extension probe below can ever match it -- timing came
+  // back empty and every frame effect fired at t=0. Read it directly.
+  if (urlNoExt.startsWith("blob:")) {
+    return getFrameTimingFromBlobUrl(urlNoExt);
+  }
 
   const parsed = parseCharacterAssetUrl(urlNoExt);
 
