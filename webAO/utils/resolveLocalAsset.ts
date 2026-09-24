@@ -165,10 +165,24 @@ export function getLocalOverrideUrl(url: string): string | null {
   if (!parsed) return null;
 
   const record = getLocalCharacterSync(parsed.charactername);
-  if (!record) return null; // not a locally-imported character -- fall through silently
+  if (!record) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[webAO DEBUG] "${parsed.charactername}" is NOT recognized as a locally-imported character ` +
+      `(getLocalCharacterSync returned nothing) -- for URL: ${url}`,
+    );
+    return null; // not a locally-imported character -- fall through silently
+  }
 
   const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
-  
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[webAO DEBUG] lookup for "${parsed.filename}" on local character "${parsed.charactername}": ` +
+    `${resolved ? `FOUND -> ${resolved}` : "NOT FOUND"}` +
+    (resolved ? "" : `\n  All stored file keys for this character:\n  ${Object.keys(record.files).join("\n  ")}`),
+  );
+
   return resolved;
 }
 
