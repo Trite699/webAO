@@ -62,6 +62,27 @@ export function resolveLocalFile(
   }
   // ------------------------
 
+  // --- FLEXIBLE SUBFOLDER FALLBACK ---
+  // Files with no "(a)"/"(b)" prefix -- preanims, above all -- don't
+  // match any of the prefix-based subfolder patterns above, so a pack
+  // that stores them anywhere other than the zip root or literally
+  // "anim/" (e.g. alongside idle/talking inside "(a)/"/"(b)/", or a
+  // custom "sprites/"/"emotions/" folder) was silently falling through
+  // to the network here, even though the same style of pack resolves
+  // idle/talking correctly. Scan every file in the zip for one whose
+  // basename matches, the same way the __base__ (sounds/background/
+  // evidence) lookup above already does.
+  if (!blob) {
+    for (const [fileKey, fileBlob] of Object.entries(record.files)) {
+      const basename = fileKey.split("/").pop();
+      if (basename === key) {
+        blob = fileBlob;
+        break;
+      }
+    }
+  }
+  // ------------------------------------
+
   if (!blob) return null;
 
   const cacheKey = `${record.name}::${key}`;
