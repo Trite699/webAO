@@ -34,6 +34,37 @@ export async function getBackgroundDesignIni(bgname: string): Promise<Record<str
   if (!text) return null;
 
   // 3. Parse the INI file content
+  return parseDesignIniText(text);
+}
+
+export interface DesignIniPosition {
+  name: string;
+  display: string;
+}
+
+/**
+ * Every "[court:<name>]" section in a parsed design.ini is a position this
+ * background supports, beyond the hardcoded def/pro/hld/hlp/wit/jud/jur/sea
+ * set. Used to keep the position dropdown (and /pos validation) in sync
+ * with whatever the CURRENT background actually defines.
+ */
+export function listDesignIniPositions(
+  designIni: Record<string, any> | null,
+): DesignIniPosition[] {
+  if (!designIni) return [];
+  const out: DesignIniPosition[] = [];
+  for (const section of Object.keys(designIni)) {
+    if (!section.startsWith("court:")) continue;
+    const name = section.slice("court:".length).trim();
+    if (!name) continue;
+    const meta = designIni[section] || {};
+    const display = meta.name || meta.display || name;
+    out.push({ name, display });
+  }
+  return out;
+}
+
+function parseDesignIniText(text: string): Record<string, any> | null {
   try {
     const lines = text.split(/\r?\n/);
     const result: Record<string, any> = {};
