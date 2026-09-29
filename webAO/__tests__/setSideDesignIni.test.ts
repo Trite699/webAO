@@ -25,7 +25,8 @@ jest.mock("../utils/fileExists", () => ({
 }));
 
 jest.mock("../viewport/utils/backgroundDesignParser", () => {
-  const actual = jest.requireActual("../viewport/utils/backgroundDesignParser");
+  // FIX: Replaced jest.requireActual with standard require for Bun compatibility
+  const actual = require("../viewport/utils/backgroundDesignParser");
   return { ...actual, getBackgroundDesignIni: jest.fn() };
 });
 
