@@ -358,7 +358,12 @@
 }
 
 #client_court_prot {
-  left: 100%;
+  /* Sits between #client_court_wit (200%) and #client_court_pro (400%),
+     the same way #client_court_deft (100%) sits between def (0%) and wit
+     (200%). This was previously 100% -- a copy/paste of deft's value --
+     which stacked it directly under deft and left nothing at 300%, so
+     panning wit -> pro crossed a gap with no art in it. */
+  left: 300%;
 }
 
 #client_pro_bench,
