@@ -4,10 +4,7 @@ import {
   listLocalCharacters,
   deleteLocalCharacter,
 } from "../utils/localCharacterStore";
-import {
-  importCharacterZipFile,
-  importZipFromUrl, // <-- Changed this import
-} from "../utils/importCharacterZip";
+import { importCharacterZipFile, importZipFromUrl } from "../utils/importCharacterZip";
 
 function setStatus(message: string, isError: boolean): void {
   const el = document.getElementById("local_char_import_status");
@@ -60,7 +57,7 @@ export async function importLocalCharacterZip(): Promise<void> {
   try {
     const name = file
       ? await importCharacterZipFile(file)
-      : await importZipFromUrl(url!); // <-- Changed the function call here
+      : await importZipFromUrl(url!, (message) => setStatus(message, false));
     setStatus(`Imported "${name}".`, false);
     if (fileInput) fileInput.value = "";
     if (urlInput) urlInput.value = "";
