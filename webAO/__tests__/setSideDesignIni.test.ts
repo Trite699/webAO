@@ -1,5 +1,5 @@
 import fileExists from "../utils/fileExists";
-import { getBackgroundDesignIni } from "../viewport/utils/backgroundDesignParser";
+import * as backgroundDesignParser from "../viewport/utils/backgroundDesignParser";
 
 jest.mock("../client/aoHost", () => ({
   AO_HOST: "http://asset.test/base/",
@@ -24,17 +24,19 @@ jest.mock("../utils/fileExists", () => ({
   default: jest.fn(),
 }));
 
-jest.mock("../viewport/utils/backgroundDesignParser", () => {
-  // FIX: Replaced jest.requireActual with standard require for Bun compatibility
-  const actual = require("../viewport/utils/backgroundDesignParser");
-  return { ...actual, getBackgroundDesignIni: jest.fn() };
-});
-
 // Imported after the mocks above so set_side picks them up.
 import { set_side } from "../viewport/utils/setSide";
 
 const mockFileExists = fileExists as unknown as jest.Mock;
-const mockGetDesignIni = getBackgroundDesignIni as jest.Mock;
+// spyOn -- rather than jest.mock()'s factory combined with either
+// jest.requireActual (a Jest-only API Bun's test runner doesn't support)
+// or a plain require() inside the factory (which recurses infinitely under
+// Jest, since Jest's require is itself mock-aware) -- stubs just this one
+// export while leaving listDesignIniPositions as the real implementation,
+// and works the same way under both Jest and Bun.
+const mockGetDesignIni = jest
+  .spyOn(backgroundDesignParser, "getBackgroundDesignIni")
+  .mockResolvedValue(null);
 
 function el(id: string, tag = "div"): HTMLElement {
   const e = document.createElement(tag);
