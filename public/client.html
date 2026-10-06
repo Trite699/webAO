@@ -917,8 +917,9 @@
         <br />
         <p>Local characters</p>
         <p style="font-size: small; opacity: 0.8; max-width: 420px">
-          Import a character folder as a .zip (or paste a link to one) to
-          use it without it needing to be uploaded to the web files.
+          Import a character folder as a .zip (or paste a direct .zip link
+          or a Google Drive share link) to use it without it needing to be
+          uploaded to the web files.
         </p>
         <input id="local_char_zip_input" type="file" accept=".zip" />
         <br />
@@ -926,7 +927,7 @@
         <input
           id="local_char_url_input"
           type="text"
-          placeholder="Or paste a .zip link"
+          placeholder="Or paste a .zip link / Google Drive link"
           style="width: 260px"
         />
         <button onclick="importLocalCharacterZip()">Import</button>
