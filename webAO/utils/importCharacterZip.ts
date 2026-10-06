@@ -130,36 +130,201 @@ export async function importBaseZipFile(file: File): Promise<string> {
   return importUniversalZipBlob(file, "Base Folder");
 }
 
-export async function importZipFromUrl(url: string, isBase = false): Promise<string> {
-  let fetchUrl = url;
+export type ImportStatusCallback = (message: string) => void;
 
-  // Google Drive interceptor
-  if (url.includes("drive.google.com/file/d/")) {
-    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) {
-      fetchUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-    }
-  }
+/**
+ * Public CORS proxies to try, in order, whenever a direct fetch is blocked
+ * by the browser. Google Drive's own download links always need one of
+ * these: Drive never sends an Access-Control-Allow-Origin header, so a
+ * plain cross-origin fetch() is rejected before we ever see a response --
+ * there's no "fix the headers" option available to a browser-only client.
+ * Each entry is tried in turn so one proxy being down/rate-limited doesn't
+ * sink the whole import.
+ */
+const CORS_PROXIES: ((url: string) => string)[] = [
+  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url) => `https://proxy.corsfix.com/?url=${encodeURIComponent(url)}`,
+];
 
-  let response: Response;
+/** "PK\x03\x04" (normal), "PK\x05\x06" (empty archive), "PK\x07\x08" (spanned). */
+function looksLikeZip(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07)
+  );
+}
+
+/**
+ * Fetches `url` and returns its bytes, trying a direct request first and
+ * falling back through CORS_PROXIES if the browser blocks it (a network-
+ * level failure, not an HTTP error status -- those are real link problems
+ * a proxy can't fix, so they're surfaced immediately instead).
+ */
+async function fetchAcrossOrigins(
+  url: string,
+  onStatus?: ImportStatusCallback,
+): Promise<Uint8Array> {
   try {
-    response = await fetch(fetchUrl);
+    const direct = await fetch(url);
+    if (!direct.ok) throw new Error(`Link error (HTTP ${direct.status}).`);
+    return new Uint8Array(await direct.arrayBuffer());
   } catch (err) {
-    console.warn("Direct fetch failed. Attempting proxy route...");
+    if (err instanceof Error && err.message.startsWith("Link error")) throw err;
+
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
+      try {
+        onStatus?.(
+          `Direct link blocked by the browser, trying proxy ${i + 1}/${CORS_PROXIES.length}…`,
+        );
+        const viaProxy = await fetch(CORS_PROXIES[i](url));
+        if (viaProxy.ok) return new Uint8Array(await viaProxy.arrayBuffer());
+      } catch {
+        // try the next proxy
+      }
+    }
+    throw new Error(
+      "Couldn't reach that link, even through a proxy. Please download the .zip and use the file picker instead.",
+    );
+  }
+}
+
+/** Extracts a Google Drive file id from any of the common share-link shapes. */
+function extractGoogleDriveFileId(parsed: URL): string | null {
+  // https://drive.google.com/file/d/<ID>/view?usp=sharing
+  // https://drive.google.com/file/d/<ID>/edit
+  const pathMatch = parsed.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (pathMatch) return pathMatch[1];
+
+  // https://drive.google.com/open?id=<ID>
+  // https://drive.google.com/uc?id=<ID>&export=download  (already a direct link)
+  const idParam = parsed.searchParams.get("id");
+  if (idParam) return idParam;
+
+  return null;
+}
+
+function buildDriveDownloadUrl(
+  fileId: string,
+  confirmParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams();
+  params.set("id", fileId);
+  params.set("export", "download");
+  if (confirmParams) {
+    const confirm = confirmParams.get("confirm");
+    const uuid = confirmParams.get("uuid");
+    if (confirm) params.set("confirm", confirm);
+    if (uuid) params.set("uuid", uuid);
+  }
+  return `https://drive.google.com/uc?${params.toString()}`;
+}
+
+/**
+ * Drive serves an HTML "can't scan this file for viruses" interstitial
+ * instead of the file itself for larger files. The page still embeds a
+ * working download link/form with a confirm token -- scrape it so we can
+ * retry and get the real file instead of telling the user to do it by hand.
+ */
+function extractDriveConfirmParams(html: string): URLSearchParams | null {
+  const hrefMatch = html.match(/href="(\/uc\?export=download[^"]*)"/);
+  if (hrefMatch) {
     try {
-      response = await fetch(`https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`);
-    } catch (proxyErr) {
-      throw new Error(`Couldn't reach that link. Please download the .zip manually.`);
+      const url = new URL(
+        hrefMatch[1].replace(/&amp;/g, "&"),
+        "https://drive.google.com",
+      );
+      return url.searchParams;
+    } catch {
+      // fall through to the hidden-field scrape below
     }
   }
 
-  if (!response.ok) throw new Error(`Link error (HTTP ${response.status}).`);
-  
-  const blob = await response.blob();
-  if (blob.type.includes("text/html")) {
-    throw new Error("Received a webpage instead of a ZIP (likely a GDrive file size block). Download it manually.");
+  const confirmMatch = html.match(/name="confirm"\s+value="([^"]+)"/);
+  const uuidMatch = html.match(/name="uuid"\s+value="([^"]+)"/);
+  if (confirmMatch || uuidMatch) {
+    const params = new URLSearchParams();
+    if (confirmMatch) params.set("confirm", confirmMatch[1]);
+    if (uuidMatch) params.set("uuid", uuidMatch[1]);
+    return params;
   }
 
-  const fallbackName = (url.split("/").pop()?.split("?")[0] || "Imported Pack").replace(/\.zip$/i, "");
-  return importUniversalZipBlob(blob, fallbackName);
+  return null;
+}
+
+async function fetchGoogleDriveZipBytes(
+  fileId: string,
+  onStatus?: ImportStatusCallback,
+): Promise<Uint8Array> {
+  onStatus?.("Fetching from Google Drive…");
+  let bytes = await fetchAcrossOrigins(buildDriveDownloadUrl(fileId), onStatus);
+
+  if (!looksLikeZip(bytes)) {
+    const confirmParams = extractDriveConfirmParams(new TextDecoder().decode(bytes));
+    if (confirmParams) {
+      onStatus?.("Drive wants virus-scan confirmation for this large file, retrying…");
+      bytes = await fetchAcrossOrigins(
+        buildDriveDownloadUrl(fileId, confirmParams),
+        onStatus,
+      );
+    }
+  }
+
+  if (!looksLikeZip(bytes)) {
+    throw new Error(
+      "Couldn't get the file straight from Google Drive (it may be too large, private, or not actually a .zip). Open the share link, download it yourself, and use the file picker instead.",
+    );
+  }
+  return bytes;
+}
+
+async function fetchDirectZipBytes(
+  url: string,
+  onStatus?: ImportStatusCallback,
+): Promise<Uint8Array> {
+  const bytes = await fetchAcrossOrigins(url, onStatus);
+  if (!looksLikeZip(bytes)) {
+    throw new Error("That link didn't return a .zip file (got something else instead).");
+  }
+  return bytes;
+}
+
+export async function importZipFromUrl(
+  url: string,
+  onStatus?: ImportStatusCallback,
+): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("That doesn't look like a valid link.");
+  }
+
+  const isGoogleDrive = /(^|\.)(drive|docs)\.google\.com$/.test(parsed.hostname);
+  const driveFileId = isGoogleDrive ? extractGoogleDriveFileId(parsed) : null;
+
+  if (isGoogleDrive && !driveFileId) {
+    throw new Error(
+      "Couldn't find a file ID in that Google Drive link. Folder links aren't supported (share a direct link to the .zip file itself).",
+    );
+  }
+
+  const bytes = driveFileId
+    ? await fetchGoogleDriveZipBytes(driveFileId, onStatus)
+    : await fetchDirectZipBytes(url, onStatus);
+
+  const fallbackName = (url.split("/").pop()?.split("?")[0] || "Imported Pack").replace(
+    /\.zip$/i,
+    "",
+  );
+  onStatus?.("Unpacking…");
+  // Blob's typings want a plain ArrayBuffer-backed BlobPart; slicing (rather
+  // than passing bytes.buffer directly) is also correct if bytes is ever a
+  // view into a larger buffer, not just a 1:1 wrapper around the whole thing.
+  const zipBuffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  return importUniversalZipBlob(new Blob([zipBuffer]), fallbackName);
 }
