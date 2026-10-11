@@ -3,6 +3,7 @@
 import { client, extrafeatures, UPDATE_INTERVAL } from "../../client";
 import { handleCharacterInfo, ensureCharIni } from "../../client/handleCharacterInfo";
 import { resetICParams } from "../../client/resetICParams";
+import { sanitizeBlipName } from "../../client/blipOverride";
 import { prepChat, safeTags } from "../../encoding";
 import { handle_ic_speaking } from "../../viewport/utils/handleICSpeaking";
 /**
@@ -170,6 +171,13 @@ export const handleMS = (args: string[]) => {
           effects: ["", "", ""],
         };
         chatmsg = Object.assign(extra_28, chatmsg);
+      }
+
+      // custom_blips: the speaker picked their blips for this message (sent
+      // right after the effects field). Empty means use their char.ini blips.
+      if (args.length > 31) {
+        const blipOverride = sanitizeBlipName(safeTags(args[31]));
+        if (blipOverride) chatmsg.blips = blipOverride;
       }
 
       if (chatmsg.content.trim() === "") {
