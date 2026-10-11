@@ -24,6 +24,7 @@ const { mode } = queryParser();
  * @param {number} other_charid paired character (optional)
  * @param {number} self_offset offset to paired character (optional)
  * @param {number} noninterrupting_preanim play the full preanim (optional)
+ * @param {string} blips blip sound override, "" for the character's own (optional)
  */
 export const sendIC = (
   deskmod: number,
@@ -52,12 +53,14 @@ export const sendIC = (
   frame_sfx: string,
   additive: boolean,
   effect: string,
+  blips: string = "",
 ) => {
   let extra_cccc = "";
   let other_emote = "";
   let other_offset = "";
   let extra_27 = "";
   let extra_28 = "";
+  let extra_29 = "";
 
   if (extrafeatures.includes("cccc_ic_support")) {
     const self_offset = extrafeatures.includes("y_offset")
@@ -79,6 +82,12 @@ export const sendIC = (
       )}#${frame_screenshake}#${frame_realization}#${frame_sfx}#`;
       if (extrafeatures.includes("effects")) {
         extra_28 = `${Number(additive)}#${escapeChat(effect)}#`;
+        // AO2's custom_blips extension: the blip name rides right after the
+        // effects field. Only sent if the server advertises it, since older
+        // servers validate the packet length. "" means "use char.ini blips".
+        if (extrafeatures.includes("custom_blips")) {
+          extra_29 = `${escapeChat(blips)}#`;
+        }
       }
     }
   }
@@ -94,7 +103,7 @@ export const sendIC = (
       evidence,
     )}#${Number(flip)}#${Number(
       realization,
-    )}#${text_color}#${extra_cccc}${extra_27}${extra_28}%`;
+    )}#${text_color}#${extra_cccc}${extra_27}${extra_28}${extra_29}%`;
 
   client.sender.sendServer(serverMessage);
   if (mode === "replay") {
