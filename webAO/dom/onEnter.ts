@@ -1,5 +1,6 @@
 import { client, selectedShout } from "../client";
 import { escapeChat } from "../encoding";
+import { sanitizeBlipName } from "../client/blipOverride";
 
 /**
  * Triggered when the Return key is pressed on the in-character chat input box.
@@ -97,7 +98,7 @@ export function onEnter(event: KeyboardEvent) {
     let emote_mod = myemo.zoom;
     if ((<HTMLInputElement>document.getElementById("sendsfx")).checked) {
       const customSfx = (<HTMLInputElement>(
-        document.getElementById("sfx_name_input")
+        document.getElementById("sfx_override")
       )).value.trim();
       sfxname = customSfx || myemo.sfx;
       // A custom sound has no char.ini-declared delay of its own; only use
@@ -105,6 +106,11 @@ export function onEnter(event: KeyboardEvent) {
       // sound, otherwise play it immediately.
       sfxdelay = customSfx ? 0 : myemo.sfxdelay;
     }
+
+    // "Override blips…" box. Blank means the character's own blips.
+    const blips = sanitizeBlipName(
+      (<HTMLInputElement>document.getElementById("blip_override")).value,
+    );
 
     // not to overwrite a 5 from the ini or anything else
     if ((<HTMLInputElement>document.getElementById("sendpreanim")).checked) {
@@ -142,6 +148,7 @@ export function onEnter(event: KeyboardEvent) {
       myemo.frame_sfx || "-",
       additive,
       effect,
+      blips,
     );
   }
   return false;
