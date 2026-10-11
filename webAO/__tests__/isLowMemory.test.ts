@@ -23,7 +23,12 @@ jest.mock('../utils/fileExists', () => ({
 
 // Set AO_HOST to a valid URL before tests run
 beforeAll(() => {
-  setAOhost('https://example.com/');
+  setAOhost('https://attorneyoffline.de/newvanillabase/');
+});
+
+const originalNavigator = Object.getOwnPropertyDescriptor(window, 'navigator');
+afterAll(() => {
+  if (originalNavigator) Object.defineProperty(window, 'navigator', originalNavigator);
 });
 
 describe('isLowMemory', () => {
@@ -33,14 +38,14 @@ describe('isLowMemory', () => {
   });
 
   it('should call setOldLoading with true when user agent is low memory device', () => {
-    Object.defineProperty(window, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.270 Safari/537.36 WebAppManager' }, writable: true });
+    Object.defineProperty(window, 'navigator', { value: { vendor: '', userAgent: 'Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.270 Safari/537.36 WebAppManager' }, writable: true });
     isLowMemory();
 
     expect(setOldLoading).toHaveBeenCalled();
   });
 
   it('should not call setOldLoading when user agent is not a low memory device', () => {
-    Object.defineProperty(window, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36' }, writable: true });
+    Object.defineProperty(window, 'navigator', { value: { vendor: '', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36' }, writable: true });
     isLowMemory();
 
     expect(setOldLoading).not.toHaveBeenCalled();
@@ -54,7 +59,7 @@ describe('isLowMemory', () => {
     ];
 
     for (const device of testCases) {
-      Object.defineProperty(window, 'navigator', { value: { userAgent: device }, writable: true });
+      Object.defineProperty(window, 'navigator', { value: { vendor: '', userAgent: device }, writable: true });
       isLowMemory();
 
       expect(setOldLoading).toHaveBeenCalledWith(true);
