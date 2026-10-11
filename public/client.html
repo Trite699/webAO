@@ -335,14 +335,6 @@
             value="sendsfx"
             checked
           />
-          <input
-            id="sfx_name_input"
-            name="sfx_name_input"
-            list="sfx_datalist"
-            placeholder="(pose's default sound)"
-            style="width: 140px"
-          />
-          <datalist id="sfx_datalist"></datalist>
           <label for="sendpreanim"> Preanimation: </label>
           <input
             type="checkbox"
@@ -350,7 +342,6 @@
             name="sendpreanim"
             value="sendpreanim"
           />
-          </span>
                         <div class="ic_overrides">
                             <input id="sfx_override" list="sfx_datalist" placeholder="Override SFX…" autocomplete="off" title="Override the emote's sound. Pick from the list or type any sound name (from base/sounds/general). Leave blank for the emote's default."/>
                             <datalist id="sfx_datalist"></datalist>
@@ -361,7 +352,7 @@
                                 <option value="normal"></option>
                                 <option value="none"></option>
                             </datalist>
-                          />
+                        </div>
           <br />
           <br />
           <button
@@ -431,7 +422,6 @@
           <br />
           <br />
      <div class="ic_group">
-                    <div class="ic_group_title">Pairing</div>
                     <div class="ic_group_body">
                         <span id="pairing" style="display: none">
                             <button id="button_toggle_pairing" alt="Pairing" class="client_button" onclick="toggleElement('pairing_settings')">Pairing</button>
