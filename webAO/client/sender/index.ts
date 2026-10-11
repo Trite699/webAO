@@ -41,6 +41,7 @@ export interface ISender {
     frame_sfx: string,
     additive: boolean,
     effect: string,
+    blips?: string,
   ) => void;
   sendSelf: (message: string) => void;
   sendServer: (message: string) => void;
