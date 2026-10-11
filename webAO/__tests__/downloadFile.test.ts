@@ -1,11 +1,33 @@
-import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import downloadFile from "../services/downloadFile";
+jest.useFakeTimers().setSystemTime(new Date("2020-01-01").getTime());
 
-GlobalRegistrator.register();
+global.URL.createObjectURL = jest.fn();
+const OriginalBlob = global.Blob;
+(window as any).global.Blob = function (content, options) {
+  return { content, options };
+};
 
-// Bun doesn't hoist jest.mock above static imports, so some tests end up
-// loading the real client.ts, whose startup code calls alert() ("No connection
-// string specified!"). Bun's native alert() blocks waiting for Enter on stdin,
-// so make the dialogs no-ops under test, rewriten for fucking bun.
-globalThis.alert = () => {};
-globalThis.confirm = () => true;
-globalThis.prompt = () => null;
+// Bun shares globals across test files, so put the real Blob back.
+afterAll(() => {
+  global.Blob = OriginalBlob;
+});
+
+describe("downloadFile", () => {
+  it("Creates an <a> tag", () => {
+    const createElementSpy = jest.spyOn(document, "createElement");
+    downloadFile("hi", "filename");
+    expect(createElementSpy).toBeCalled();
+  });
+  it("Creates the blob with the correct data", () => {
+    const data = "writingtestsishard";
+    global.URL.createObjectURL = jest.fn(() => data);
+    downloadFile(data, "filename");
+    const expected = {
+      content: [data],
+      options: {
+        type: "text",
+      },
+    };
+    expect(global.URL.createObjectURL).toBeCalledWith(expected);
+  });
+});
