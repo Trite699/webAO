@@ -1,6 +1,7 @@
 import { client, selectedShout } from "../client";
 import { escapeChat } from "../encoding";
 import { sanitizeBlipName } from "../client/blipOverride";
+import { ensurePositionOption } from "../viewport/utils/positionOptions";
 
 /**
  * Triggered when the Return key is pressed on the in-character chat input box.
@@ -47,8 +48,9 @@ export function onEnter(event: KeyboardEvent) {
       ? (<HTMLInputElement>document.getElementById("role_select")).value
       : mychar.side;
 
-    // "/pos <name>" chat-command shortcut: switches position without
-    // touching the Role dropdown. Anything typed after the position name
+    // "/pos <name>" chat-command shortcut: behaves exactly like picking
+    // that entry in the Role dropdown (unknown names get added to it).
+    // Anything typed after the position name
     // is still sent as the IC message; if nothing else was typed, no IC
     // message is sent at all -- it's purely a position change.
     const posMatch = /^\/pos\s+(\S+)\s*(.*)$/i.exec(text);
@@ -56,28 +58,18 @@ export function onEnter(event: KeyboardEvent) {
       myrole = posMatch[1].toLowerCase();
       text = posMatch[2];
 
-      const roleSelect = <HTMLSelectElement>(
+      const roleSelect = <HTMLSelectElement | null>(
         document.getElementById("role_select")
       );
-      
-      if (roleSelect) {
-        const matchingOption = Array.from(roleSelect.options).find(
-          (opt) => opt.value.toLowerCase() === myrole,
-        );
-        
-        if (matchingOption) {
-          roleSelect.value = matchingOption.value;
-        } else {
-          // Custom position detected! Add it to the dropdown so the UI remembers it.
-          const newOption = document.createElement("option");
-          newOption.value = myrole;
-          newOption.text = `Custom (${myrole})`;
-          roleSelect.appendChild(newOption);
-          roleSelect.value = myrole;
-        }
 
-        // --- THE CRUCIAL LINE ---
-        // This forces the game to visually update your background immediately
+      if (roleSelect) {
+        // Known position: just select it. Unknown one: add it to the Role
+        // dropdown so it can be picked from there from now on too.
+        const option = ensurePositionOption(myrole);
+        if (option) roleSelect.value = option.value;
+
+        // Fires changeRoleOOC(): sends /pos + SP to the server and
+        // updates the viewport straight away.
         roleSelect.dispatchEvent(new Event("change"));
       }
 
