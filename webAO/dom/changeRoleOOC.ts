@@ -1,5 +1,6 @@
 import { updateActionCommands } from "./updateActionCommands";
 import { client } from "../client";
+import { previewPosition } from "./previewPosition";
 /**
  * Change role via OOC.
  */
@@ -9,5 +10,6 @@ export function changeRoleOOC() {
   client.sender.sendOOC(`/pos ${roleselect.value}`);
   client.sender.sendServer(`SP#${roleselect.value}#%`);
   updateActionCommands(roleselect.value);
+  previewPosition(roleselect.value);
 }
 window.changeRoleOOC = changeRoleOOC;
