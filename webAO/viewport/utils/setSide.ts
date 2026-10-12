@@ -5,6 +5,7 @@ import transparentPng from "../../constants/transparentPng";
 import fileExists from "../../utils/fileExists";
 import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
 import { getBackgroundDesignIni, listDesignIniPositions } from "../utils/backgroundDesignParser";
+import { ensurePositionOption } from "./positionOptions";
 
 // A list of ALL extensions to check locally, since webAO defaults often miss webp/jpg
 const ALL_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -67,21 +68,24 @@ function syncPositionDropdown(entries: { name: string; display: string }[]): voi
   const wanted = new Map(entries.map((e) => [e.name.toLowerCase(), e.display]));
 
   Array.from(roleSelect.options).forEach((opt) => {
-    if (opt.dataset.source === "design-ini" && !wanted.has(opt.value.toLowerCase())) {
+    if (
+      opt.dataset.source === "design-ini" &&
+      !wanted.has(opt.value.toLowerCase()) &&
+      // never yank the position the player is currently on
+      roleSelect.value !== opt.value
+    ) {
       roleSelect.removeChild(opt);
     }
   });
 
-  const existingValues = new Set(
-    Array.from(roleSelect.options).map((o) => o.value.toLowerCase()),
-  );
   for (const [name, display] of wanted) {
-    if (existingValues.has(name)) continue; // already present (standard position, or added earlier)
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.text = display;
-    opt.dataset.source = "design-ini";
-    roleSelect.appendChild(opt);
+    const opt = ensurePositionOption(name, display, "design-ini");
+    // A position first typed via /pos (tagged "custom") that this
+    // background also defines gets its proper display name.
+    if (opt && opt.dataset.source === "custom") {
+      opt.text = display;
+      opt.dataset.source = "design-ini";
+    }
   }
 }
 
