@@ -5,6 +5,7 @@ import {
   resolveAndPreloadAudio,
   getAnimDuration,
 } from "../../utils/assetCache";
+import resolveEmotePrefix from "../../utils/resolveEmotePrefix";
 import transparentPng from "../../constants/transparentPng";
 
 const GLOBAL_TIMEOUT_MS = 8000;
@@ -20,6 +21,7 @@ function buildEmoteUrls(
   emotename: string,
   prefix: string,
 ): string[] {
+  prefix = resolveEmotePrefix(emotename, prefix);
   const characterFolder = `${AO_HOST}characters/`;
   const urls: string[] = [];
 
