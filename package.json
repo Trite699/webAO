@@ -1,6 +1,6 @@
 {
   "name": "webao",
-  "version": "2.9.0 beta",
+  "version": "2.9.1 beta",
   "description": "Web-based Attorney Online client",
   "main": "client.js",
   "scripts": {
