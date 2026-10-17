@@ -1,4 +1,5 @@
 import { selectedShout, setSelectedShout } from "../client";
+import { hidePickerUI } from "./customShoutPicker";
 import { stopTypingNow } from "../dom/updateTypingIndicator";
 
 /**
@@ -19,5 +20,6 @@ export function resetICParams() {
     document.getElementById(`button_${selectedShout}`)!.className =
       "client_button";
     setSelectedShout(0);
+    hidePickerUI();
   }
 }
