@@ -57,6 +57,10 @@ export let selectedShout = 0;
 export const setSelectedShout = (val: number) => {
   selectedShout = val;
 };
+export let selectedCustomShout = "custom";
+export const setSelectedCustomShout = (val: string) => {
+  selectedCustomShout = val;
+};
 export let extrafeatures: string[] = [];
 export const setExtraFeatures = (val: any) => {
   extrafeatures = val;
