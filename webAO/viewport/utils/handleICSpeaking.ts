@@ -5,6 +5,11 @@ import { checkCallword } from "../../client/checkCallword";
 import setEmoteFromUrl from "../../client/setEmoteFromUrl";
 import { AO_HOST } from "../../client/aoHost";
 import { SHOUTS } from "../constants/shouts";
+import {
+  buildShoutBubbleCandidates,
+  getOverrideShouts,
+  resolveMiscFolder,
+} from "./miscAssets";
 import { setChatbox } from "../../dom/setChatbox";
 import { resizeChatbox } from "../../dom/resizeChatbox";
 import transparentPng from "../../constants/transparentPng";
@@ -410,7 +415,6 @@ const backgroundHasPanorama = async (): Promise<boolean> => {
   return false;
 };
 
-const SHOUT_EXTS = [".webp", ".apng", ".gif", ".png"];
 
 let attorneyMarkdown: ReturnType<typeof mlConfig> | null = null;
 export let markdownDisabled = false;
@@ -584,40 +588,18 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
   if (shout) {
     // Hide message box
     chatContainerBox.style.opacity = "0";
-    if (client.viewport.getChatmsg().objection === 4) {
-      // Custom shout: probe extensions (Apollo's is custom.apng, not .gif).
-      const charName = client.viewport.getChatmsg().name!.toLowerCase();
-      const customCandidates = SHOUT_EXTS.map(
-        (e) => `${AO_HOST}characters/${encodeURI(charName)}/custom${e}`,
-      );
-      shoutSprite.src = await resolveAndPreloadImage(customCandidates);
-      shoutSprite.style.animation = "bubble 700ms steps(10, jump-both)";
-    } else {
-      // Resolve the interjection bubble like the desktop client: from the
-      // THEME folder first (where these assets actually live), then the
-      // legacy misc/default, probing animated extensions. Upstream
-      // hard-pointed at misc/default/<name>_bubble.png, which 404s when
-      // the bubbles are theme assets -- so no overlay appeared at all.
-      const fname = `${shout}_bubble`;
-      // Fallback chain: the CHARACTER'S OWN folder first (a char can ship
-      // its own splashes, e.g. JudgeSOJ's holdit_bubble), then the chat
-      // misc folder (misc/<chat>, e.g. misc/dd), then the theme, then
-      // misc/default -- matching AO2's priority.
-      const miscFolder = client.viewport.getChatmsg().miscFolder || "default";
-      const charName = (client.viewport.getChatmsg().name || "").toLowerCase();
-      const bubbleCandidates = [
-        ...SHOUT_EXTS.map(
-          (e) => `${AO_HOST}characters/${encodeURI(charName)}/${fname}${e}`,
-        ),
-        ...SHOUT_EXTS.map(
-          (e) => `${AO_HOST}misc/${encodeURI(miscFolder)}/${fname}${e}`,
-        ),
-        ...SHOUT_EXTS.map((e) => `${AO_HOST}themes/default/${fname}${e}`),
-        ...SHOUT_EXTS.map((e) => `${AO_HOST}misc/default/${fname}${e}`),
-      ];
-      shoutSprite.src = await resolveAndPreloadImage(bubbleCandidates);
-      shoutSprite.style.animation = "bubble 700ms steps(10, jump-both)";
-    }
+    // Bubble lookup (webp / apng / png). Order depends on "Override Shouts":
+    // off -> misc/<chat> first; on -> the character's own folder first.
+    const bubbleMsg = client.viewport.getChatmsg();
+    const bubbleCandidates = buildShoutBubbleCandidates(
+      AO_HOST,
+      (bubbleMsg.name || "").toLowerCase(),
+      resolveMiscFolder(bubbleMsg),
+      shout,
+      getOverrideShouts(),
+    );
+    shoutSprite.src = await resolveAndPreloadImage(bubbleCandidates);
+    shoutSprite.style.animation = "bubble 700ms steps(10, jump-both)";
     shoutSprite.style.display = "block";
 
     // Log the interjection in the IC log like AO2: "<showname> shouts GOTCHA!"
@@ -661,7 +643,7 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
           client.viewport.getChatmsg().name!.toLowerCase(),
         )}/custom`
       : null;
-    const miscChat = client.viewport.getChatmsg().miscFolder || "default";
+    const miscChat = resolveMiscFolder(client.viewport.getChatmsg());
     const shoutCharName = (client.viewport.getChatmsg().name || "").toLowerCase();
     const sfxBases = [
       customSfx,
