@@ -5,6 +5,7 @@ import { checkCallword } from "../../client/checkCallword";
 import setEmoteFromUrl from "../../client/setEmoteFromUrl";
 import { AO_HOST } from "../../client/aoHost";
 import { SHOUTS } from "../constants/shouts";
+import { buildCustomShoutAudioBases } from "./customShouts";
 import {
   buildShoutBubbleCandidates,
   getOverrideShouts,
@@ -584,7 +585,12 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
   // gets which shout shall played
   const shoutSprite = <HTMLImageElement>document.getElementById("client_shout");
 
-  const shout = SHOUTS[client.viewport.getChatmsg().objection];
+  const shoutMsgData = client.viewport.getChatmsg();
+  // objection 4 = custom shout; its id may be a [Shouts] entry like "cross"
+  const shout =
+    shoutMsgData.objection === 4
+      ? shoutMsgData.customShout || "custom"
+      : SHOUTS[shoutMsgData.objection];
   if (shout) {
     // Hide message box
     chatContainerBox.style.opacity = "0";
@@ -638,15 +644,17 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
     // Resolve the shout SFX through a fallback chain, trying both .opus
     // and .wav (misc/<chat> folders like misc/dd ship .wav shout sounds).
     const isCustom = client.viewport.getChatmsg().objection === 4;
-    const customSfx = isCustom
-      ? `${AO_HOST}characters/${encodeURI(
+    const customSfxBases = isCustom
+      ? buildCustomShoutAudioBases(
+          AO_HOST,
           client.viewport.getChatmsg().name!.toLowerCase(),
-        )}/custom`
-      : null;
+          shout,
+        )
+      : [];
     const miscChat = resolveMiscFolder(client.viewport.getChatmsg());
     const shoutCharName = (client.viewport.getChatmsg().name || "").toLowerCase();
     const sfxBases = [
-      customSfx,
+      ...customSfxBases,
       `${AO_HOST}characters/${encodeURI(shoutCharName)}/${shout}`,
       `${AO_HOST}misc/${encodeURI(miscChat)}/${shout}`,
       `${AO_HOST}themes/default/${shout}`,
@@ -670,7 +678,9 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
       client.viewport.shoutaudio.src = shoutSfx;
       client.viewport.shoutaudio.play().catch(() => {});
     }
-    client.viewport.setShoutTimer(client.resources[shout].duration);
+    client.viewport.setShoutTimer(
+      (client.resources[shout] || client.resources.custom).duration,
+    );
   } else {
     client.viewport.setShoutTimer(0);
   }
