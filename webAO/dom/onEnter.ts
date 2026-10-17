@@ -1,4 +1,5 @@
-import { client, selectedShout } from "../client";
+import { client, selectedShout, selectedCustomShout } from "../client";
+import { formatObjectionField } from "../viewport/utils/customShouts";
 import { escapeChat } from "../encoding";
 import { sanitizeBlipName } from "../client/blipOverride";
 import { ensurePositionOption } from "../viewport/utils/positionOptions";
@@ -123,7 +124,7 @@ export function onEnter(event: KeyboardEvent) {
       sfxname,
       emote_mod,
       sfxdelay,
-      selectedShout,
+      formatObjectionField(selectedShout, selectedCustomShout),
       evi,
       flip,
       flash,
