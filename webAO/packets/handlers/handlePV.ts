@@ -5,6 +5,7 @@ import { pickEmotion } from "../../dom/pickEmotion";
 import { AO_HOST } from "../../client/aoHost";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
 import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { refreshCustomShouts } from "../../client/customShoutPicker";
 import { loadSoundList } from "../../client/loadSoundList";
 
 function addEmoteButton(i: number, imgurl: string, desc: string) {
@@ -127,14 +128,7 @@ export const handlePV = async (args: string[]) => {
     }
   }
 
-  if (
-    await fileExists(
-      `${AO_HOST}characters/${encodeURI(me.name.toLowerCase())}/custom.gif`,
-    )
-  ) {
-    document.getElementById("button_4")!.style.display = "";
-  } else {
-    document.getElementById("button_4")!.style.display = "none";
-  }
-
+  // Custom shouts come from char.ini [Shouts] (Custom_Name, Cross_Name, ...)
+  // and may be webp / apng / png (not just custom.gif).
+  await refreshCustomShouts(me.name, ini.shouts);
 };
