@@ -1,6 +1,7 @@
 import Client from "../client";
 import transparentPng from "../constants/transparentPng";
 import fileExists from "../utils/fileExists";
+import resolveEmotePrefix from "../utils/resolveEmotePrefix";
 // ADD isLocalCharacterName to your import here:
 import { getLocalOverrideUrl, isLocalCharacterName } from "../utils/resolveLocalAsset";
 
