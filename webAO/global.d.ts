@@ -16,6 +16,7 @@ declare global {
     pickEvidence: (evidence: number) => void;
     reloadTheme: () => void;
     renderLocalCharacterList: () => void;
+    toggleOverrideShouts: () => void;
     resizeChatbox: () => void;
     setChatbox: (setstyle: string) => void;
     showname_click: (_event: Event | null) => void;
