@@ -36,7 +36,7 @@ export const sendIC = (
   sfx_name: string,
   emote_modifier: number,
   sfx_delay: number,
-  objection_modifier: number,
+  objection_modifier: number | string,
   evidence: number,
   flip: boolean,
   realization: boolean,
@@ -99,7 +99,7 @@ export const sendIC = (
     `#${escapeChat(message)}#${escapeChat(side)}#${escapeChat(
       sfx_name,
     )}#${emote_modifier}` +
-    `#${client.charID}#${sfx_delay}#${Number(objection_modifier)}#${Number(
+    `#${client.charID}#${sfx_delay}#${String(objection_modifier)}#${Number(
       evidence,
     )}#${Number(flip)}#${Number(
       realization,
