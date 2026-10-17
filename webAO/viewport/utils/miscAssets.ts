@@ -34,6 +34,8 @@ export const setOverrideShouts = (val: boolean): void => {
   }
 };
 
+import { buildCustomShoutImageCandidates } from "./customShouts";
+
 /**
  * The misc folder a message uses: an explicit miscFolder, otherwise the
  * character's char.ini `chat =` value (AO2 uses it as the misc folder name),
@@ -66,14 +68,17 @@ export function buildShoutBubbleCandidates(
   shout: string,
   override: boolean,
 ): string[] {
-  const fname = shout === "custom" ? "custom" : `${shout}_bubble`;
+  const isBuiltin = ["holdit", "objection", "takethat"].includes(shout);
+  if (!isBuiltin) {
+    // Custom shouts (custom, or any [Shouts] "<id>_name" entry) only exist
+    // in the character folder (or its custom_objections subfolder).
+    return buildCustomShoutImageCandidates(AO_HOST, charName, shout);
+  }
+  const fname = `${shout}_bubble`;
   const charBase = `${AO_HOST}characters/${encodeURI(charName)}/${fname}`;
   const miscBase = `${AO_HOST}misc/${encodeURI(miscFolder)}/${fname}`;
   const themeBase = `${AO_HOST}themes/default/${fname}`;
   const defaultBase = `${AO_HOST}misc/default/${fname}`;
-
-  // "custom" only ever exists in the character folder.
-  if (shout === "custom") return withExts(charBase, BUBBLE_EXTS);
 
   const ordered = override
     ? [charBase, miscBase, themeBase, defaultBase]
