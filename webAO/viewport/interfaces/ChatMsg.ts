@@ -3,6 +3,8 @@ import { PreloadedAssets } from "./PreloadedAssets";
 export interface ChatMsg {
   content: string;
   objection: number;
+  /** id of the custom shout when objection === 4 ("custom" if unset) */
+  customShout?: string;
   sound: string;
   startpreanim?: boolean;
   startspeaking?: boolean;
