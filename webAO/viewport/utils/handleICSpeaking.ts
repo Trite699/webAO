@@ -624,7 +624,7 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
         const sIni: any = await ensureCharIni(
           client.viewport.getChatmsg().charid,
         );
-        const m = sIni && sIni.shouts && sIni.shouts[`${shout}_message`];
+        const m = sIni && sIni.shouts && sIni.shouts[`${shout.toLowerCase()}_message`];
         if (m) shoutMsg = m;
       } catch (e) {
         /* keep fallback */
