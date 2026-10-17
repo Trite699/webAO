@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     toggleShout: (shout: number) => void;
+    toggleOverrideShouts: () => void;
     toggleMenu: (menu: number) => void;
     updateBackgroundPreview: () => void;
     redHPP: () => void;
