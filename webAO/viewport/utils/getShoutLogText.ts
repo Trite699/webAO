@@ -22,7 +22,9 @@ export const getShoutLogText = (chatmsg: ChatMsg): string => {
     // Custom shout: character's own shout word, from char.ini [Shouts] Custom_Message
     try {
       const custom =
-        client.chars[chatmsg.charid!]?.inifile?.shouts?.custom_message;
+        client.chars[chatmsg.charid!]?.inifile?.shouts?.[
+          `${chatmsg.customShout || "custom"}_message`
+        ];
       return custom ? `shouts ${custom}` : "";
     } catch (e) {
       return "";
