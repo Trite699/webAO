@@ -24,7 +24,7 @@ export interface ISender {
     sfx_name: string,
     emote_modifier: number,
     sfx_delay: number,
-    objection_modifier: number,
+    objection_modifier: number | string,
     evidence: number,
     flip: boolean,
     realization: boolean,
