@@ -1,4 +1,3 @@
-
 interface ParsedIni {
   [section: string]: { [key: string]: string };
 }
@@ -11,6 +10,10 @@ const regexPatterns = {
   // these characters allowed, those lines were silently dropped.
   param: /^\s*([\w.\-_/\\]+)\s*=\s*(.*?)\s*$/,
   comment: /^\s*;.*$/,
+  // [Shouts] keys are AO2 custom shout NAMES plus "_message"/"_name", e.g.
+  // "Yes! (Voice Crack)_message" or "'Scuse me!_message", so they may contain
+  // spaces and punctuation. Only allowed inside [Shouts].
+  shoutParam: /^\s*([^=]+?)\s*=\s*(.*?)\s*$/,
 };
 
 const valueHandler = (matchKey: string, matchValue: string): string => {
@@ -45,15 +48,24 @@ const iniParse = (data: string): ParsedIni => {
   let currentSection: string | undefined;
 
   filteredLines.forEach((line) => {
-    const isParameter: boolean = regexPatterns.param.test(line);
+    const isShoutsSection = currentSection === "shouts";
+    const paramRegex = isShoutsSection
+      ? regexPatterns.shoutParam
+      : regexPatterns.param;
+    const isParameter: boolean = paramRegex.test(line);
     const isSection: boolean = regexPatterns.section.test(line);
     if (isParameter && currentSection) {
-      const match: RegExpMatchArray | null = line.match(regexPatterns.param);
+      const match: RegExpMatchArray | null = line.match(paramRegex);
 
       if (match) {
         const matchKey: string = match[1].toLowerCase();
         const matchValue: string = match[2];
         parsedIni[currentSection][matchKey] = valueHandler(matchKey, matchValue);
+        if (isShoutsSection) {
+          // Keep the author's original casing: shout names double as file
+          // names (custom_objections/<Name>.png), which can be case-sensitive.
+          parsedIni[currentSection][`@orig:${matchKey}`] = match[1];
+        }
       }
     } else if (isSection) {
       const match: RegExpMatchArray | null = line.match(regexPatterns.section);
