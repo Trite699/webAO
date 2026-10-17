@@ -1,6 +1,7 @@
 /* eslint indent: ["error", 2, { "SwitchCase": 1 }] */
 
 import { client, extrafeatures, UPDATE_INTERVAL } from "../../client";
+import { parseObjectionField } from "../../viewport/utils/customShouts";
 import { handleCharacterInfo, ensureCharIni } from "../../client/handleCharacterInfo";
 import { resetICParams } from "../../client/resetICParams";
 import { sanitizeBlipName } from "../../client/blipOverride";
@@ -87,7 +88,7 @@ export const handleMS = (args: string[]) => {
         type: Number(args[8]),
         charid: char_id,
         snddelay: Number(args[10]),
-        objection: Number(args[11]),
+        ...parseObjectionField(args[11]),
         evidence: Number(safeTags(args[12])),
         flip: Number(args[13]),
         flash: Number(args[14]),
