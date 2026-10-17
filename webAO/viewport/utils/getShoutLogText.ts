@@ -23,7 +23,7 @@ export const getShoutLogText = (chatmsg: ChatMsg): string => {
     try {
       const custom =
         client.chars[chatmsg.charid!]?.inifile?.shouts?.[
-          `${chatmsg.customShout || "custom"}_message`
+          `${(chatmsg.customShout || "custom").toLowerCase()}_message`
         ];
       return custom ? `shouts ${custom}` : "";
     } catch (e) {
