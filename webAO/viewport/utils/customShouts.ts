@@ -1,17 +1,23 @@
 /**
- * Custom shout support. A character can have several custom shouts, listed in
- * char.ini's [Shouts] section as "<id>_name" / "<id>_message" pairs:
+ * Custom shout support (AO2 "custom_objections").
  *
+ * A custom shout's NAME is its identity: it is the key prefix in char.ini's
+ * [Shouts] section and the file name inside the character's
+ * custom_objections folder (image = bubble, audio = sound):
+ * example:
  *   [Shouts]
- *   Custom_Name    = Gotcha!      -> id "custom"  (custom.webp/apng/png)
- *   Custom_Message = GOTCHA!
- *   Cross_Name     = Cross!       -> id "cross"   (cross.webp/apng/png)
- *   Cross_Message  = CROSS!
+ *   custom_name                = Yes!
+ *   custom_message             = YES!
+ *   'Scuse me!_message         = 'SCUSE ME!
+ *   Yes! (Voice Crack)_message = YES!
  *
- * Images are looked up in the character folder, then characters/<c>/custom_objections/.
- * On the wire, the plain "custom" shout is objection "4"; any other custom
- * shout is sent as "4&<id>" (the AO2 custom_objections convention).
+ *   characters/<char>/custom_objections/'Scuse me!.png      (or webp/apng/gif)
+ *   characters/<char>/custom_objections/'Scuse me!.wav      (or opus)
+ *
+ * The plain "custom" shout is also found as characters/<char>/custom.<ext>.
+ * On the wire, "custom" is objection "4"; any other shout is "4&<name>".
  */
+import { escapeChat, unescapeChat } from "../../encoding";
 
 export interface CustomShout {
   id: string;
@@ -24,72 +30,95 @@ export const BUILTIN_SHOUT_IDS = ["holdit", "objection", "takethat"];
 /** Image formats for custom shouts (gif kept last as a legacy fallback). */
 export const CUSTOM_SHOUT_EXTS = [".webp", ".apng", ".png", ".gif"];
 
-const SAFE_ID = /^[a-z0-9_.\- ]{1,64}$/;
+// Shout names are used as file names and sent over the wire, so reject path
+// separators, packet delimiters and control characters. Spaces and
+// punctuation such as ! ' ( ) are fine.
+// eslint-disable-next-line no-control-regex
+const SAFE_ID = /^[^\\/#%$<>?:*"|&\u0000-\u001f]{1,64}$/;
 
-/** Normalises a shout id; returns null if it is unsafe to put in a URL. */
+/** Validates a shout name (case is preserved); null if unsafe in a URL/packet. */
 export function sanitizeShoutId(raw: string): string | null {
-  const id = (raw || "").trim().toLowerCase();
+  const id = (raw || "").trim();
   if (!SAFE_ID.test(id) || id.includes("..")) return null;
   return id;
 }
 
 /**
- * Reads the custom shout ids declared in a parsed [Shouts] section.
- * "custom" is always included first, since a bare custom.<ext> works
- * without any ini entry.
+ * Reads the custom shouts declared in a parsed [Shouts] section. "custom" is
+ * always first, since a bare custom.<ext> works without any ini entry.
+ * Shouts can be declared by "<name>_name" and/or "<name>_message".
  */
 export function listCustomShouts(
   shouts?: { [key: string]: string } | null,
 ): CustomShout[] {
-  const ids: string[] = ["custom"];
+  const entries: { id: string; lower: string }[] = [
+    { id: "custom", lower: "custom" },
+  ];
   for (const key of Object.keys(shouts || {})) {
-    const m = /^(.+)_(name|message)$/.exec(key.toLowerCase());
+    if (key.startsWith("@orig:")) continue;
+    const m = /^(.+)_(name|message)$/i.exec(key);
     if (!m) continue;
-    const id = sanitizeShoutId(m[1]);
-    if (id && !BUILTIN_SHOUT_IDS.includes(id) && !ids.includes(id)) ids.push(id);
+    // The parser stores the author's original casing under "@orig:<key>".
+    const original = shouts?.[`@orig:${key}`] ?? key;
+    const id = sanitizeShoutId(original.slice(0, original.length - m[2].length - 1));
+    if (!id) continue;
+    const lower = id.toLowerCase();
+    if (BUILTIN_SHOUT_IDS.includes(lower) || entries.some((e) => e.lower === lower)) {
+      continue;
+    }
+    entries.push({ id, lower });
   }
-  return ids.map((id) => {
-    const name = shouts?.[`${id}_name`] || "";
-    const message = shouts?.[`${id}_message`] || "";
-    return { id, name: name || message || id, message };
+  return entries.map(({ id, lower }) => {
+    const name = shouts?.[`${lower}_name`] || "";
+    const message = shouts?.[`${lower}_message`] || "";
+    return { id, name: name || id, message };
   });
 }
 
-/** Parses the MS packet objection field: "2", "4", or "4&cross". */
+/** Parses the MS objection field: "2", "4", "4&Yes! (Voice Crack)". */
 export function parseObjectionField(raw: string): {
   objection: number;
   customShout?: string;
 } {
-  const [num, extra] = String(raw ?? "").split("&");
-  const objection = Number(num);
-  if (objection === 4 && extra) {
-    const id = sanitizeShoutId(extra);
-    if (id && id !== "custom") return { objection, customShout: id };
+  const m = /^\s*(\d+)(?:&|<and>)(.+)$/.exec(String(raw ?? ""));
+  if (m && Number(m[1]) === 4) {
+    const id = sanitizeShoutId(unescapeChat(m[2]));
+    if (id && id.toLowerCase() !== "custom") return { objection: 4, customShout: id };
   }
-  return { objection };
+  return { objection: Number(String(raw ?? "").split(/&|<and>/)[0]) };
 }
 
-/** Builds the objection field to send: "4&cross" for non-default customs. */
+/** Builds the objection field to send: "4&<name>" for non-default customs. */
 export function formatObjectionField(
   objection: number,
   customShout?: string,
 ): string {
-  if (objection === 4 && customShout && customShout !== "custom") {
+  if (objection === 4 && customShout && customShout.toLowerCase() !== "custom") {
     const id = sanitizeShoutId(customShout);
-    if (id) return `4&${id}`;
+    if (id) return `4&${escapeChat(id)}`;
   }
   return String(objection);
 }
 
-/** Candidate image URLs for a custom shout. */
+/** Folder + name variants to try (AO2 custom_objections first, then root). */
+function shoutBases(AO_HOST: string, charName: string, id: string): string[] {
+  const base = `${AO_HOST}characters/${encodeURI(charName)}`;
+  const names = Array.from(new Set([id, id.toLowerCase()])).map(encodeURIComponent);
+  return [
+    ...names.map((n) => `${base}/custom_objections/${n}`),
+    ...names.map((n) => `${base}/${n}`),
+  ];
+}
+
+/** Candidate image URLs (the bubble) for a custom shout. */
 export function buildCustomShoutImageCandidates(
   AO_HOST: string,
   charName: string,
   id: string,
 ): string[] {
-  const base = `${AO_HOST}characters/${encodeURI(charName)}`;
-  return [`${base}/${encodeURI(id)}`, `${base}/custom_objections/${encodeURI(id)}`]
-    .flatMap((b) => CUSTOM_SHOUT_EXTS.map((e) => `${b}${e}`));
+  return shoutBases(AO_HOST, charName, id).flatMap((b) =>
+    CUSTOM_SHOUT_EXTS.map((e) => `${b}${e}`),
+  );
 }
 
 /** Candidate audio base URLs (no extension) for a custom shout. */
@@ -98,6 +127,5 @@ export function buildCustomShoutAudioBases(
   charName: string,
   id: string,
 ): string[] {
-  const base = `${AO_HOST}characters/${encodeURI(charName)}`;
-  return [`${base}/${encodeURI(id)}`, `${base}/custom_objections/${encodeURI(id)}`];
+  return shoutBases(AO_HOST, charName, id);
 }
