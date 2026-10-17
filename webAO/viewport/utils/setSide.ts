@@ -6,6 +6,8 @@ import fileExists from "../../utils/fileExists";
 import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
 import { getBackgroundDesignIni, listDesignIniPositions } from "../utils/backgroundDesignParser";
 import { ensurePositionOption } from "./positionOptions";
+import { resolveAndPreloadImage } from "../../utils/assetCache";
+import { buildSpeedlineCandidates, resolveMiscFolder } from "./miscAssets";
 
 // A list of ALL extensions to check locally, since webAO defaults often miss webp/jpg
 const ALL_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -209,7 +211,22 @@ export const set_side = async ({
   }
 
   if (showSpeedLines === true) {
-    court.src = `${AO_HOST}themes/default/${encodeURI(speedLines)}`;
+    // Speedlines: misc/<chat>/ first (webp/apng/png/gif), then the theme.
+    const fallbackSpeedlines = `${AO_HOST}themes/default/${encodeURI(speedLines)}`;
+    let resolvedSpeedlines = fallbackSpeedlines;
+    try {
+      const found = await resolveAndPreloadImage(
+        buildSpeedlineCandidates(
+          AO_HOST,
+          resolveMiscFolder(client.viewport.getChatmsg()),
+          speedLines,
+        ),
+      );
+      if (found && found !== transparentPng) resolvedSpeedlines = found;
+    } catch (e) {
+      /* keep the legacy theme URL */
+    }
+    court.src = resolvedSpeedlines;
   } else if (customOrigin !== null && !isStitchedPosition) {
     // The design.ini panorama is ONE shared image per background (not a
     // per-position file named after "bg"/position) -- load it once, not
