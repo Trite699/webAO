@@ -1,4 +1,5 @@
 import { selectedShout, setSelectedShout } from "../client";
+import { hidePickerUI, showPickerUI } from "../client/customShoutPicker";
 
 /**
  * Highlights and selects a shout for in-character chat.
@@ -9,6 +10,7 @@ export function toggleShout(shout: number) {
   if (shout === selectedShout) {
     document.getElementById(`button_${shout}`)!.className = "client_button";
     setSelectedShout(0);
+    hidePickerUI();
   } else {
     document.getElementById(`button_${shout}`)!.className =
       "client_button dark";
@@ -17,6 +19,9 @@ export function toggleShout(shout: number) {
         "client_button";
     }
     setSelectedShout(shout);
+    // Custom Shout with several shouts in char.ini: let the player choose
+    if (shout === 4) showPickerUI();
+    else hidePickerUI();
   }
 }
 window.toggleShout = toggleShout;
