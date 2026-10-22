@@ -8,6 +8,12 @@ export interface ICLogEntry {
   showname: string;
   text: string;
   time: string; // formatted time label, or "" when no timestamp is shown
+  /** when the message was logged (used for downloaded logs) */
+  date?: Date;
+  /** text color name ("red", "blue"...), "" for the default color */
+  color?: string;
+  /** true for divider notices such as "Connected" / "Disconnected" */
+  notice?: boolean;
 }
 
 export const icLogHistory: ICLogEntry[] = [];
@@ -20,7 +26,13 @@ export const MAX_LOG_NODES = 500;
  * oldest from the top. Bounds DOM size (layout/paint/memory) on long sessions.
  */
 export function capLogNodes(container: HTMLElement, max = MAX_LOG_NODES) {
-  while (container.childNodes.length > max && container.firstChild) {
-    container.removeChild(container.firstChild);
+  let node = container.firstChild;
+  while (container.childNodes.length > max && node) {
+    const next = node.nextSibling;
+    // Nodes marked data-keep (e.g. the Download Log toolbar) are never trimmed.
+    if (!(node instanceof HTMLElement && node.dataset.keep)) {
+      container.removeChild(node);
+    }
+    node = next;
   }
 }
