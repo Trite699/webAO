@@ -2,6 +2,8 @@ declare global {
   interface Window {
     toggleShout: (shout: number) => void;
     toggleOverrideShouts: () => void;
+    downloadLog: () => void;
+    toggleAutoDownloadLogs: () => void;
     onCustomShoutChosen: () => void;
     toggleMenu: (menu: number) => void;
     updateBackgroundPreview: () => void;
