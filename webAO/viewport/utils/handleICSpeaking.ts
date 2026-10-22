@@ -1047,15 +1047,32 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
   client.viewport.chat_tick();
 
   try {
+    const logMsg = client.viewport.getChatmsg();
+    const logColor = logMsg.color > 0 ? COLORS[logMsg.color] : "";
+    // Colored per-character spans for the log. keepTags=true keeps the markup
+    // characters (~ | ` ...) visible in the log, tinted like the text.
+    let logNodes: HTMLElement[] | undefined;
+    if (!markdownDisabled) {
+      try {
+        const md = await initAttorneyMarkdown();
+        if (md) {
+          logNodes = md.applyMarkdown(
+            logMsg.content,
+            COLORS[logMsg.color],
+            true,
+          );
+        }
+      } catch (err) {
+        /* fall back to a single colored span */
+      }
+    }
     appendICLog(
-      client.viewport.getChatmsg().content,
-      client.viewport.getChatmsg().showname,
-      client.viewport.getChatmsg().nameplate,
+      logMsg.content,
+      logMsg.showname,
+      logMsg.nameplate,
       new Date(),
-      client.viewport.getChatmsg().color > 0
-        ? COLORS[client.viewport.getChatmsg().color]
-        : "",
-      client.viewport.getChatmsg().parsed,
+      logColor,
+      logNodes,
     );
   } catch (e) {
     console.error("appendICLog failed", e);
