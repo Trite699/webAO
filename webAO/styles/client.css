@@ -587,8 +587,25 @@
   line-height: 0.85em;
 }
 
+/* Same font stack as the chat box text; also kept in sync from JS */
+#client_log {
+  font-family: "Igiari Cyrillic", "MS PGothic", "MS UI Gothic", "MS Sans Serif",
+    "Hiragino Maru Gothic Pro", "Mitra Mono", "Mukti Narrow", "Meera",
+    "Khmer OS", "FreeSans", "Gargi", sans-serif;
+}
+
 #client_log > p {
   line-height: 1.1em;
+}
+
+#client_log_toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-align: right;
+  padding: 2px 4px;
+  line-height: normal;
+  background-color: #242424;
 }
 
 .iclog_name {
