@@ -970,6 +970,24 @@
         <br />
         <br />
         <br />
+        <p>Logs</p>
+        <label for="check_autolog">Auto-download logs on disconnect:</label>
+        <input
+          type="checkbox"
+          id="check_autolog"
+          name="check_autolog"
+          onchange="toggleAutoDownloadLogs()"
+        />
+        <br />
+        <button
+          id="button_download_log_settings"
+          class="client_button"
+          onclick="downloadLog()"
+        >
+          Download Log
+        </button>
+        <br />
+        <br />
         <label for="client_callwords">Callwords:</label>
         <br />
         <textarea
@@ -1022,6 +1040,16 @@
   <template id="log">
     <meta name="frame-title" lang="en" content="Log" />
     <div id="client_log">
+      <div id="client_log_toolbar" data-keep="true">
+        <button
+          id="button_download_log"
+          class="client_button"
+          onclick="downloadLog()"
+          title="Download the chat log as a text file"
+        >
+          Download Log
+        </button>
+      </div>
       <div class="hrtext">&#8595; log starts here &#8595;</div>
     </div>
   </template>
