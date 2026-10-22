@@ -1,3 +1,4 @@
+import { getAutoDownloadLogs } from "./downloadLogs";
 import vanilla_evidence_arr from "../constants/evidence.js";
 import vanilla_background_arr from "../constants/backgrounds.js";
 import { changeMusicVolume } from "../dom/changeMusicVolume";
@@ -80,6 +81,11 @@ export const loadResources = () => {
 
   (<HTMLInputElement>document.getElementById("client_callwords")).value =
     localStorage.getItem("callwords");
+
+  const autoLog = <HTMLInputElement | null>(
+    document.getElementById("check_autolog")
+  );
+  if (autoLog) autoLog.checked = getAutoDownloadLogs();
 
   const storedRatio = localStorage.getItem("viewportRatio") || "4:3";
   const ratioSelect = <HTMLSelectElement>(
