@@ -1,4 +1,3 @@
-
 interface Aoml {
   [key: string]: string | number;
   name: string;
@@ -54,7 +53,16 @@ const mlConfig = (iniContent: string) => {
     }
     return startingIdentifiers;
   };
-  const applyMarkdown = (text: string, defaultColor: string) => {
+  /**
+   * @param keepTags when true, markup characters (~ | ` etc.) that the chat
+   *   box would hide are kept in the output, still tinted with their color.
+   *   Used by the IC log so the tags stay visible.
+   */
+  const applyMarkdown = (
+    text: string,
+    defaultColor: string,
+    keepTags = false,
+  ) => {
     const identifiers = createIdentifiers();
     const startIdentifiers = createStartIdentifiers();
     const closingStack = [];
@@ -74,7 +82,7 @@ const mlConfig = (iniContent: string) => {
         currentSelector.setAttribute("style", currentColor);
         closingStack.pop();
         colorStack.pop();
-        if (keepChar) {
+        if (keepChar || keepTags) {
           currentSelector.innerHTML = letter;
         }
       } else if (startIdentifiers.has(letter)) {
@@ -86,7 +94,7 @@ const mlConfig = (iniContent: string) => {
         closingStack.push(currentIdentifier.end);
         const currentColor = `color: rgb(${r},${g},${b});`;
         currentSelector.setAttribute("style", currentColor);
-        if (keepChar) {
+        if (keepChar || keepTags) {
           currentSelector.innerHTML = letter;
         }
       } else {
