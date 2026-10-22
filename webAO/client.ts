@@ -14,6 +14,7 @@ import { EventEmitter } from "events";
 import { onReplayGo } from "./dom/onReplayGo";
 import { packetHandler } from "./packets/packetHandler";
 import { appendICNotice } from "./client/appendICNotice";
+import { autoDownloadLogsOnDisconnect } from "./client/downloadLogs";
 import { loadResources } from "./client/loadResources";
 import { AO_HOST } from "./client/aoHost";
 import {
@@ -307,6 +308,8 @@ class Client extends EventEmitter {
       }
       (<HTMLElement>document.getElementById("client_reconnect")).style.display = "";
     }
+    // Save the IC log on disconnect if the setting is enabled
+    autoDownloadLogsOnDisconnect();
     document.getElementById("client_error_overlay").style.display = "flex";
     document.getElementById("client_loading").style.display = "none";
     document.getElementById("error_id").textContent = String(e.code);
