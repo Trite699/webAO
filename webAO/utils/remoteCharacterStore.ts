@@ -172,6 +172,7 @@ export function registerRemoteCharacter(
   };
   remotes.set(record.name, record);
   persist();
+  void loadRemoteIndex(record);
   return record;
 }
 
@@ -223,3 +224,101 @@ export function ingestRemoteName(raw: string): string {
   }
   return name;
 }
+
+const pathIndex = new Map<string, Map<string, string>>();
+const INDEX_PREFIX = "webao_remote_index:";
+
+function indexFor(name: string): Map<string, string> {
+  const key = name.toLowerCase();
+  let m = pathIndex.get(key);
+  if (!m) {
+    m = new Map();
+    pathIndex.set(key, m);
+  }
+  return m;
+}
+
+/** Real-cased path (relative to the character folder) for a lower-cased one. */
+export function lookupRemotePath(name: string, lowerPath: string): string | undefined {
+  return pathIndex.get(name.toLowerCase())?.get(lowerPath.toLowerCase());
+}
+
+export function rememberRemotePath(name: string, realPath: string): void {
+  indexFor(name).set(realPath.toLowerCase(), realPath);
+}
+
+/** Case variants worth probing on a CDN with no index: "normala.webp" ->
+ *  "Normala.webp", and Title-Case per hyphen/space word of each segment. */
+export function caseVariants(path: string): string[] {
+  const cap = (w: string) => (w ? w[0].toUpperCase() + w.slice(1) : w);
+  const segs = path.split("/");
+  const variants = new Set<string>();
+  variants.add(segs.map(cap).join("/"));
+  variants.add(
+    segs.map((sg) => sg.split("-").map(cap).join("-")).join("/"),
+  );
+  variants.add(
+    segs.map((sg, i) => (i === segs.length - 1 ? cap(sg) : sg)).join("/"),
+  );
+  variants.delete(path);
+  return Array.from(variants);
+}
+
+/** owner/repo/branch/path of a raw.githubusercontent.com character folder. */
+function parseGithubRaw(base: string) {
+  const u = new URL(base);
+  if (u.hostname !== "raw.githubusercontent.com") return null;
+  const parts = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts.length < 4) return null;
+  const [owner, repo, ...rest] = parts;
+  if (rest[0] === "refs" && rest[1] === "heads") rest.splice(0, 2);
+  const [branch, ...dir] = rest;
+  if (!branch || dir.length === 0) return null;
+  return { owner, repo, branch, dir: dir.join("/") };
+}
+
+/** Fetches the character folder's file list from GitHub (one API call). */
+export async function loadRemoteIndex(rec: RemoteCharacter): Promise<void> {
+  const gh = parseGithubRaw(rec.base);
+  if (!gh) return;
+  const cacheKey = INDEX_PREFIX + rec.name;
+  const idx = indexFor(rec.name);
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as { base: string; paths: string[] };
+      if (parsed.base === rec.base) {
+        parsed.paths.forEach((p) => idx.set(p.toLowerCase(), p));
+        return;
+      }
+    }
+  } catch {
+    /* fall through to network */
+  }
+  try {
+    const ref = encodeURIComponent(`${gh.branch}:${gh.dir}`);
+    const res = await fetch(
+      `https://api.github.com/repos/${gh.owner}/${gh.repo}/git/trees/${ref}?recursive=1`,
+    );
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      tree?: { path: string; type: string }[];
+    };
+    const paths = (data.tree ?? [])
+      .filter((t) => t.type === "blob")
+      .map((t) => t.path);
+    paths.forEach((p) => idx.set(p.toLowerCase(), p));
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ base: rec.base, paths }));
+    } catch {
+      /* cache is optional */
+    }
+  } catch {
+    /* offline / rate limited: probing fallback still works */
+  }
+}
+
+// Rebuild indexes for characters saved in an earlier session.
+remotes.forEach((rec) => {
+  void loadRemoteIndex(rec);
+});
