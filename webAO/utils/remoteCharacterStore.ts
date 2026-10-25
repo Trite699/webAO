@@ -1,5 +1,25 @@
+/**
+ * "Remote" characters: characters that live on someone else's CDN / asset
+ * server (e.g. https://mastyra.com/base/characters/Means/) and are streamed
+ * from there on demand -- nothing is downloaded or stored beyond the link.
+ *
+ * Unlike the zip-based local characters, a remote character CAN be shared:
+ * when you speak as one, your client tags the character name with the CDN
+ * location (see encodeRemoteName), and every other client that has this
+ * feature registers it automatically and loads the sprites straight from
+ * the CDN. Clients WITHOUT this feature only see the plain character name
+ * and resolve it against their own asset host as usual -- there is no way
+ * for a browser client to change that from the outside.
+ *
+ * Requirements on the CDN side: it must serve the usual AO layout
+ * (<base>/char.ini, <base>/(a)emote.gif, ...) and ideally send
+ * "Access-Control-Allow-Origin: *" so char.ini / animation timing can be
+ * read. Plain <img> sprite loading works without CORS.
+ */
+
 const STORAGE_KEY = "webao_remote_characters";
 const ACCEPT_KEY = "webao_accept_remote_characters";
+const SHARE_KEY = "webao_share_remote_links";
 /** Separator between the real character name and the encoded CDN location. */
 export const REMOTE_SEP = "~cdn~";
 
@@ -49,6 +69,30 @@ export function isAcceptingRemoteCharacters(): boolean {
 export function setAcceptRemoteCharacters(accept: boolean): void {
   try {
     localStorage.setItem(ACCEPT_KEY, accept ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Whether outgoing messages carry the CDN link (default OFF). Off means
+ * everyone receives the plain character name, so anyone who already has that
+ * character (AO2, any webAO) simply sees it. On is only useful when other
+ * players run this patched webAO and DON'T have the character, because
+ * clients without the patch can't understand the extra tag and will look for
+ * a folder with that tagged name and find nothing.
+ */
+export function isSharingRemoteLinks(): boolean {
+  try {
+    return localStorage.getItem(SHARE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setShareRemoteLinks(share: boolean): void {
+  try {
+    localStorage.setItem(SHARE_KEY, share ? "1" : "0");
   } catch {
     /* ignore */
   }
@@ -145,13 +189,13 @@ export function getRemoteCharacter(name: string): RemoteCharacter | undefined {
 }
 
 /**
- * Name to put in outgoing IC packets: the plain name for normal characters,
- * "<name>~cdn~<host/path>" (scheme omitted, "!" prefix means http) for
- * remote ones, so receiving clients with this feature can find the files.
+ * Name to put in outgoing IC packets: always the plain name, unless the user
+ * opted in to sharing links, in which case remote characters are sent as
+ * "<name>~cdn~<host/path>" (scheme omitted, "!" prefix means http).
  */
 export function encodeRemoteName(name: string): string {
   const rec = remotes.get(name.toLowerCase());
-  if (!rec) return name;
+  if (!rec || !isSharingRemoteLinks()) return name;
   const u = new URL(rec.base);
   const loc = `${u.protocol === "http:" ? "!" : ""}${u.host}${u.pathname}`;
   return `${rec.displayName}${REMOTE_SEP}${loc}`;
