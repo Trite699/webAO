@@ -6,6 +6,7 @@ import { handleCharacterInfo, ensureCharIni } from "../../client/handleCharacter
 import { resetICParams } from "../../client/resetICParams";
 import { sanitizeBlipName } from "../../client/blipOverride";
 import { prepChat, safeTags } from "../../encoding";
+import { ingestRemoteName } from "../../utils/remoteCharacterStore";
 import { handle_ic_speaking } from "../../viewport/utils/handleICSpeaking";
 /**
  * Handles an in-character chat message.
@@ -15,9 +16,9 @@ export const handleMS = (args: string[]) => {
   // duplicate message
   if (args[5] !== client.viewport.getChatmsg().content) {
     const char_id = Number(args[9]);
-    const char_name = safeTags(args[3]);
+    const char_name = safeTags(ingestRemoteName(args[3]));
 
-    let msg_nameplate = args[3];
+    let msg_nameplate = char_name;
     let msg_blips = "male";
     let char_chatbox = "default";
     let char_muted = false;
@@ -38,7 +39,7 @@ export const handleMS = (args: string[]) => {
     try {
       msg_nameplate = client.chars[char_id].showname;
     } catch (e) {
-      msg_nameplate = args[3];
+      msg_nameplate = char_name;
     }
 
     try {
@@ -100,7 +101,7 @@ export const handleMS = (args: string[]) => {
         const extra_cccc = {
           showname: prepChat(args[16]),
           other_charid: Number(args[17]),
-          other_name: safeTags(args[18]),
+          other_name: safeTags(ingestRemoteName(args[18])),
           other_emote: safeTags(args[19]),
           self_offset: args[20].split("<and>"), // HACK: here as well, client is fucked and uses this instead of &
           other_offset: args[21].split("<and>"),
