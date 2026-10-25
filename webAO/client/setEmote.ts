@@ -3,7 +3,7 @@ import transparentPng from "../constants/transparentPng";
 import fileExists from "../utils/fileExists";
 import resolveEmotePrefix from "../utils/resolveEmotePrefix";
 // ADD isLocalCharacterName to your import here:
-import { getLocalOverrideUrl, isLocalCharacterName } from "../utils/resolveLocalAsset";
+import { getLocalOverrideUrl, isLocalCharacterName, resolveAssetUrl } from "../utils/resolveLocalAsset";
 
 /**
  * Sets all the img tags to the right sources
@@ -50,21 +50,21 @@ const setEmote = async (
       )}${encodeURI(emotename)}${extension}`;
     }
 
-    // 1. Check local storage
+    // Check local storage
     const localUrl = getLocalOverrideUrl(url);
     if (localUrl) {
       emoteSelector.src = localUrl;
       break; 
     }
 
-    // 2. NEW CHECK: Is this an uploaded character? 
+    // NEW CHECK: Is this an uploaded character? 
     // If YES, don't hit the network. 'continue' moves to the next extension (.gif, .webp, etc) 
     // but restricts the search entirely to local storage.
     if (isLocalCharacterName(charactername)) {
       continue;
     }
 
-    // 3. Network fallback (ONLY runs for characters loaded from the server)
+    // Network fallback (ONLY runs for characters loaded from the server)
     const exists = await fileExists(url);
     if (exists) {
       emoteSelector.src = url;
