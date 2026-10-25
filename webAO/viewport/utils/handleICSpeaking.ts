@@ -1,3 +1,8 @@
+import {
+  probeRemoteSound,
+  resolveSoundUrl,
+  setRemoteSpeaker,
+} from "../../utils/remoteSounds";
 import { ChatMsg } from "../interfaces/ChatMsg";
 import { client } from "../../client";
 import { appendICLog } from "../../client/appendICLog";
@@ -319,7 +324,13 @@ function playEffectSfx(name: string): void {
     return;
   }
   const base = `${AO_HOST}sounds/general/${encodeURI(name.toLowerCase())}`;
-  const audio = new Audio(`${base}.opus`);
+  void probeRemoteSound(undefined, `${base}.opus`).then((cdn) =>
+    startEffectSfx(base, cdn),
+  );
+}
+
+function startEffectSfx(base: string, cdn: string | null): void {
+  const audio = new Audio(cdn ?? `${base}.opus`);
   // The main SFX audio element carries the SFX volume setting.
   const sfxAudio = <HTMLAudioElement>document.getElementById("client_sfxaudio");
   audio.volume = sfxAudio ? sfxAudio.volume : 1;
@@ -844,6 +855,7 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
     }
   }
 
+  setRemoteSpeaker(client.viewport.getChatmsg().name);
   const blipName = client.viewport.getChatmsg().blips.toLowerCase();
   client.viewport.blipChannels.forEach((channel: HTMLAudioElement) => {
     // "none" (or empty) blips => no blip sound (e.g. Trucy's Mr. Hat emotes
@@ -851,7 +863,10 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
     channel.src =
       blipName === "none" || blipName === ""
         ? ""
-        : `${AO_HOST}sounds/blips/${encodeURI(blipName)}.opus`;
+        : resolveSoundUrl(
+            `${AO_HOST}sounds/blips/${encodeURI(blipName)}.opus`,
+            client.viewport.getChatmsg().name,
+          );
   });
 
   // process markup
