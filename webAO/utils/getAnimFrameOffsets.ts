@@ -3,6 +3,7 @@ import fileExists from "./fileExists";
 import { requestBuffer } from "../services/request";
 import {
   getLocalOverrideUrl,
+  resolveAssetUrl,
   parseCharacterAssetUrl,
   isLocalCharacterName,
 } from "./resolveLocalAsset";
@@ -195,7 +196,7 @@ export async function getAnimFrameOffsets(urlNoExt: string): Promise<FrameTiming
     const url = urlNoExt + ext;
     try {
       if (await fileExists(url)) {
-        const resolvedUrl = getLocalOverrideUrl(url) || url;
+        const resolvedUrl = resolveAssetUrl(url);
         const buf = await requestBuffer(resolvedUrl);
         const delays = extractors[ext](new Uint8Array(buf));
         const timing = delays.length ? fromDelays(delays) : empty;
