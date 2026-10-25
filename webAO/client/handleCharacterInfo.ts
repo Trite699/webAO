@@ -1,75 +1,160 @@
-import Client from "../client";
-import transparentPng from "../constants/transparentPng";
-import fileExists from "../utils/fileExists";
-import resolveEmotePrefix from "../utils/resolveEmotePrefix";
-// ADD isLocalCharacterName to your import here:
-import { getLocalOverrideUrl, isLocalCharacterName, resolveAssetUrl } from "../utils/resolveLocalAsset";
+import { client } from "../client";
+import { safeTags } from "../encoding";
+import iniParse from "../iniParse";
+import request from "../services/request";
+import { AO_HOST } from "./aoHost";
+import { getLocalCharacterSync } from "../utils/localCharacterStore";
+import { getLocalIconUrl, getRemoteUrl } from "../utils/resolveLocalAsset";
 
 /**
- * Sets all the img tags to the right sources
- * @param {*} chatmsg
- */
+ * Resolves the character icon src, preferring a locally-imported
+ * character's own icon over the network guess.
+ */
+function iconSrcFor(name: string): string {
+  const localIcon = getLocalIconUrl(name, client.charicon_extensions);
+  if (localIcon) return localIcon;
+  const iconExt = client.charicon_extensions[0] || ".png";
+  const iconUrl = `${AO_HOST}characters/${encodeURI(name.toLowerCase())}/char_icon${iconExt}`;
+  return getRemoteUrl(iconUrl) ?? iconUrl;
+}
 
-const setEmote = async (
-  AO_HOST: string,
-  client: Client,
-  charactername: string,
-  emotename: string,
-  prefix: string,
-  pair: boolean,
-  side: string,
-) => {
-  const pairID = pair ? "pair" : "char";
-  const characterFolder = `${AO_HOST}characters/`;
-  const acceptedPositions = ["def", "pro", "wit"];
-  const position = acceptedPositions.includes(side) ? `${side}_` : "";
-  const emoteSelector = document.getElementById(
-    `client_${position}${pairID}_img`,
-  ) as HTMLImageElement;
+/**
+ * Lightweight character setup that runs on join. Sets the icon src directly
+ * (letting the browser handle loading) and stores default character data.
+ * Does NOT fetch char.ini — that is deferred until needed via ensureCharIni.
+ */
+export const setupCharacterBasic = (chargs: string[], charid: number) => {
+  const img = <HTMLImageElement>document.getElementById(`demo_${charid}`);
+  if (chargs[0]) {
+    img.alt = chargs[0];
+    img.title = chargs[0];
+    img.src = iconSrcFor(chargs[0]);
+    const listIcon = <HTMLImageElement>(
+      document.getElementById(`charlist_icon_${charid}`)
+    );
+    const listName = document.getElementById(`charlist_name_${charid}`);
+    if (listIcon) {
+      listIcon.src = img.src;
+      listIcon.alt = chargs[0];
+    }
+    if (listName) listName.textContent = safeTags(chargs[0]);
 
-  for (const extension of client.emote_extensions) {
-    // Hides all sprites before creating a new sprite
-    if (
-      client.viewport.getLastCharacter() !== client.viewport.getChatmsg().name
-    ) {
-      emoteSelector.src = transparentPng;
-    }
-    
-    let url;
-    if (extension === ".png") {
-      url = `${characterFolder}${encodeURI(charactername)}/${encodeURI(
-        emotename,
-      )}${extension}`;
-    } else if (extension === ".webp.static") {
-      url = `${characterFolder}${encodeURI(charactername)}/${encodeURI(
-        emotename,
-      )}.webp`;
-    } else {
-      url = `${characterFolder}${encodeURI(charactername)}/${encodeURI(
-        prefix,
-      )}${encodeURI(emotename)}${extension}`;
-    }
+    const mute_select = <HTMLSelectElement>(
+      document.getElementById("mute_select")
+    );
+    mute_select.add(new Option(safeTags(chargs[0]), String(charid)));
+    const pair_select = <HTMLSelectElement>(
+      document.getElementById("pair_select")
+    );
+    pair_select.add(new Option(safeTags(chargs[0]), String(charid)));
 
-    // Check local storage
-    const localUrl = getLocalOverrideUrl(url);
-    if (localUrl) {
-      emoteSelector.src = localUrl;
-      break; 
-    }
-
-    // NEW CHECK: Is this an uploaded character? 
-    // If YES, don't hit the network. 'continue' moves to the next extension (.gif, .webp, etc) 
-    // but restricts the search entirely to local storage.
-    if (isLocalCharacterName(charactername)) {
-      continue;
-    }
-
-    // Network fallback (ONLY runs for characters loaded from the server)
-    const exists = await fileExists(url);
-    if (exists) {
-      emoteSelector.src = url;
-      break;
-    }
-  }
+    // Store defaults — these get replaced with actual ini values by ensureCharIni
+    client.chars[charid] = {
+      name: safeTags(chargs[0]),
+      showname: safeTags(chargs[0]),
+      desc: safeTags(chargs[1]),
+      blips: "male",
+      gender: "",
+      side: "def",
+      chat: "",
+      evidence: chargs[3],
+      icon: "",
+      muted: false,
+    };
+  } else {
+    console.warn(`missing charid ${charid}`);
+    img.style.display = "none";
+    const missingEntry = document.getElementById(`charlist_${charid}`);
+    if (missingEntry) missingEntry.style.display = "none";
+  }
 };
-export default setEmote;
+
+/**
+ * Fetches and parses char.ini for a character if not already loaded.
+ * Replaces default values in client.chars[charid] with actual ini values.
+ */
+export const ensureCharIni = async (charid: number): Promise<any> => {
+  const char = client.chars[charid];
+  if (!char) return {};
+  if (char.inifile) return char.inifile;
+
+  const img = <HTMLImageElement>document.getElementById(`demo_${charid}`);
+  let cini: any = {};
+
+  const localChar = getLocalCharacterSync(char.name);
+  try {
+    const cinidata = localChar
+      ? localChar.iniText
+      : await request(
+          `${AO_HOST}characters/${encodeURI(char.name.toLowerCase())}/char.ini`,
+        );
+    cini = iniParse(cinidata);
+  } catch (err) {
+    cini = {};
+    if (img) img.classList.add("noini");
+    console.warn(`character ${char.name} is missing from webAO`);
+  }
+
+  const default_options = {
+    name: char.name,
+    showname: char.name,
+    side: "def",
+    blips: "male",
+    chat: "",
+    category: "",
+  };
+  cini.options = Object.assign(default_options, cini.options);
+
+  const default_emotions = {
+    number: 0,
+  };
+  cini.emotions = Object.assign(default_emotions, cini.emotions);
+
+  // Replace defaults with actual ini values
+  char.showname = safeTags(cini.options.showname);
+  char.blips = safeTags(cini.options.blips).toLowerCase();
+  char.gender = safeTags(cini.options.gender).toLowerCase();
+  char.side = safeTags(cini.options.side).toLowerCase();
+  char.chat =
+    cini.options.chat === ""
+      ? safeTags(cini.options.category).toLowerCase()
+      : safeTags(cini.options.chat).toLowerCase();
+  char.icon = img ? img.src : "";
+  char.inifile = cini;
+
+  if (
+    char.blips === "male" &&
+    char.gender !== "male" &&
+    char.gender !== ""
+  ) {
+    char.blips = char.gender;
+  }
+
+  return cini;
+};
+
+/**
+ * Full character info load (used by iniEdit and handleMS ini-edit path).
+ * Fetches icon + ini for a single character, replacing any existing data.
+ */
+export const handleCharacterInfo = async (chargs: string[], charid: number) => {
+  const img = <HTMLImageElement>document.getElementById(`demo_${charid}`);
+  if (chargs[0]) {
+    img.alt = chargs[0];
+    img.title = chargs[0];
+    img.src = iconSrcFor(chargs[0]);
+    if (client.chars[charid]) {
+      client.chars[charid].name = safeTags(chargs[0]);
+      client.chars[charid].inifile = null;
+    } else {
+      setupCharacterBasic(chargs, charid);
+    }
+
+    await ensureCharIni(charid);
+  } else {
+    console.warn(`missing charid ${charid}`);
+    img.style.display = "none";
+    const missingEntry = document.getElementById(`charlist_${charid}`);
+    if (missingEntry) missingEntry.style.display = "none";
+  }
+};
