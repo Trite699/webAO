@@ -5,6 +5,8 @@ import {
   listRemoteCharacters,
   isAcceptingRemoteCharacters,
   setAcceptRemoteCharacters,
+  isSharingRemoteLinks,
+  setShareRemoteLinks,
 } from "../utils/remoteCharacterStore";
 import { useLocalCharacter } from "./localCharacterPanel";
 
@@ -74,6 +76,17 @@ export function toggleAcceptRemote(): void {
   setAcceptRemoteCharacters(!!box?.checked);
 }
 window.toggleAcceptRemote = toggleAcceptRemote;
+
+export function toggleShareRemote(): void {
+  const box = <HTMLInputElement>document.getElementById("remote_char_share");
+  setShareRemoteLinks(!!box?.checked);
+}
+window.toggleShareRemote = toggleShareRemote;
+
+const shareBox = <HTMLInputElement | null>(
+  document.getElementById("remote_char_share")
+);
+if (shareBox) shareBox.checked = isSharingRemoteLinks();
 
 const acceptBox = <HTMLInputElement | null>(
   document.getElementById("remote_char_accept")
