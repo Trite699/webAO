@@ -25,5 +25,10 @@ declare global {
     updateBackgroundPreview: () => void;
     updateTypingIndicator: () => void;
     useLocalCharacter: (name: string) => void;
+    renderRemoteCharacterList: () => void;
+    addRemoteCharacter: () => Promise<void>;
+    useRemoteCharacter: (name: string) => void;
+    deleteRemoteCharacterUI: (name: string) => void;
+    toggleAcceptRemote: () => void;
   }
 }
