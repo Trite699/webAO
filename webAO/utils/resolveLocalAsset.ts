@@ -1,5 +1,9 @@
 import { getLocalCharacterSync } from "./localCharacterStore";
-import { getRemoteCharacter } from "./remoteCharacterStore";
+import {
+  getRemoteCharacter,
+  lookupRemotePath,
+  caseVariants,
+} from "./remoteCharacterStore";
 
 // Object URLs are cheap to create but should be created once per blob and
 // reused, rather than minted fresh (and leaked) on every lookup.
@@ -27,7 +31,7 @@ export function resolveLocalFile(
   // --- DOUBLE-PREFIX FIX ---
   // If webAO prepends (a) or (b) to an emote name that ALREADY starts with (a) or (b)
   // (e.g. requesting "(a)(a)lobster.gif" for an INI entry defined as "(a)lobster"),
-  // strip the extra wrapper and look up the real file "(a)lobster.gif" fucking hell.
+  // strip the extra wrapper and look up the real file "(a)lobster.gif".
   if (!blob) {
     const doublePrefixMatch = /^(\(a\)|\(b\))(\(a\)|\(b\))(.+)$/.exec(key);
     if (doublePrefixMatch) {
@@ -172,7 +176,7 @@ export function getLocalOverrideUrl(url: string): string | null {
       `[webAO DEBUG] "${parsed.charactername}" is NOT recognized as a locally-imported character ` +
       `(getLocalCharacterSync returned nothing) -- for URL: ${url}`,
     );
-    return null; // not a locally-imported character so fall through silently
+    return null; // not a locally-imported character -- fall through silently
   }
 
   const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
@@ -203,7 +207,7 @@ export function getLocalIconUrl(
  * If the URL is a "characters/<name>/<file>" URL for a registered remote
  * (CDN) character, returns the equivalent URL on that CDN; otherwise null.
  * Local zip imports take priority, so callers check getLocalOverrideUrl first.
- * This does NOT imply the file exists callers still probe if it exists.
+ * This does NOT imply the file exists -- callers still probe it (fileExists).
  */
 export function getRemoteUrl(url: string): string | null {
   const parsed = parseCharacterAssetUrl(url);
@@ -211,8 +215,28 @@ export function getRemoteUrl(url: string): string | null {
   const remote = getRemoteCharacter(parsed.charactername);
   if (!remote) return null;
   if (getLocalCharacterSync(parsed.charactername)) return null;
-  const path = parsed.filename.split("?")[0].split("/").map(encodeURIComponent).join("/");
+  const wanted = parsed.filename.split("?")[0];
+  const real = lookupRemotePath(parsed.charactername, wanted) ?? wanted;
+  const path = real.split("/").map(encodeURIComponent).join("/");
   return `${remote.base}${path}`;
+}
+
+/**
+ * Other-case spellings of a remote character file URL, for CDNs that are
+ * case-sensitive and have no known file list. [] if not a remote character.
+ */
+export function getRemoteUrlVariants(
+  url: string,
+): { name: string; path: string; url: string }[] {
+  const parsed = parseCharacterAssetUrl(url);
+  if (!parsed) return [];
+  const remote = getRemoteCharacter(parsed.charactername);
+  if (!remote) return [];
+  return caseVariants(parsed.filename.split("?")[0]).map((path) => ({
+    name: parsed.charactername,
+    path,
+    url: `${remote.base}${path.split("/").map(encodeURIComponent).join("/")}`,
+  }));
 }
 
 /** Local override, else remote CDN rewrite, else the URL unchanged. */
