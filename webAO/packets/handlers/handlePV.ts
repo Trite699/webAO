@@ -4,7 +4,7 @@ import { updateActionCommands } from "../../dom/updateActionCommands";
 import { pickEmotion } from "../../dom/pickEmotion";
 import { AO_HOST } from "../../client/aoHost";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
-import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { resolveAssetUrl } from "../../utils/resolveLocalAsset";
 import { refreshCustomShouts } from "../../client/customShoutPicker";
 import { loadSoundList } from "../../client/loadSoundList";
 
@@ -13,7 +13,7 @@ function addEmoteButton(i: number, imgurl: string, desc: string) {
   const emote_item = new Image();
   emote_item.id = "emo_" + i;
   emote_item.className = "emote_button";
-  emote_item.src = getLocalOverrideUrl(imgurl) ?? imgurl;
+  emote_item.src = resolveAssetUrl(imgurl);
   emote_item.alt = desc;
   emote_item.title = desc;
   emote_item.onclick = () => {
