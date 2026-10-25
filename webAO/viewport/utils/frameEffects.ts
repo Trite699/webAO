@@ -9,6 +9,7 @@
  * stopFrameEffects(). The browser exposes no frame events, hence the
  * timer-based approach driven by getAnimFrameOffsets().
  */
+import { probeRemoteSound } from "../../utils/remoteSounds";
 import { AO_HOST } from "../../client/aoHost";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
 import { resolveAssetUrl } from "../../utils/resolveLocalAsset";
@@ -158,19 +159,22 @@ function playFrameSfx(name: string): void {
     const url = `${base}${ext}`;
     return resolveAssetUrl(url);
   };
-  const a = new Audio(sourceFor(".opus"));
-  // Respect the SFX volume setting (the main SFX audio element holds it).
-  const sfxAudio = document.getElementById("client_sfxaudio") as HTMLAudioElement | null;
-  a.volume = sfxAudio ? sfxAudio.volume : 1;
-  a.addEventListener(
-    "error",
-    () => {
-      a.src = sourceFor(".wav");
-      a.play().catch(() => {});
-    },
-    { once: true },
-  );
-  a.play().catch(() => {});
+  // CDN character: use the sound from the speaker's CDN if it has one.
+  void probeRemoteSound(undefined, `${base}.opus`).then((cdn) => {
+    const a = new Audio(cdn ?? sourceFor(".opus"));
+    // Respect the SFX volume setting (the main SFX audio element holds it).
+    const sfxAudio = document.getElementById("client_sfxaudio") as HTMLAudioElement | null;
+    a.volume = sfxAudio ? sfxAudio.volume : 1;
+    a.addEventListener(
+      "error",
+      () => {
+        a.src = sourceFor(".wav");
+        a.play().catch(() => {});
+      },
+      { once: true },
+    );
+    a.play().catch(() => {});
+  });
 }
 
 function doShake(): void {
