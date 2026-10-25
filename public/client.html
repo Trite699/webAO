@@ -938,6 +938,33 @@
         <p id="local_char_import_status" style="font-size: small"></p>
         <div id="local_char_list"></div>
         <br />
+        <p>CDN characters</p>
+        <p style="font-size: small; opacity: 0.8; max-width: 420px">
+          Paste the link to a character's folder on any asset server (for
+          example https://host/base/characters/Name/) to use it straight
+          from there &mdash; nothing is downloaded. Other webAO users with
+          this feature will see it too; everyone else sees the plain name
+          and uses whatever their own server has.
+        </p>
+        <input
+          id="remote_char_url_input"
+          type="text"
+          placeholder="https://host/base/characters/Name/"
+          style="width: 260px"
+        />
+        <button onclick="addRemoteCharacter()">Add &amp; use</button>
+        <p id="remote_char_status" style="font-size: small"></p>
+        <div id="remote_char_list"></div>
+        <label for="remote_char_accept" style="font-size: small">
+          Load CDN characters other players are using:
+        </label>
+        <input
+          id="remote_char_accept"
+          type="checkbox"
+          checked
+          onchange="toggleAcceptRemote()"
+        />
+        <br />
         <br />
         <p>Slide</p>
         <label for="client_pantilt">Enable:</label>
