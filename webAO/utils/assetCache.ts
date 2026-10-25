@@ -11,6 +11,7 @@
  * preloading, and animation duration calculation.
  */
 
+import { probeRemoteSound } from "./remoteSounds";
 import findImgSrc from "./findImgSrc";
 import fileExists from "./fileExists";
 import getAnimLength from "./getAnimLength";
@@ -57,9 +58,18 @@ export function resolveAndPreloadImage(urls: string[]): Promise<string> {
  * Checks if an audio URL exists, then preloads it into the browser cache.
  * Returns the URL if it exists, or null.
  */
-export function resolveAndPreloadAudio(url: string): Promise<string | null> {
-  const key = `audio:${url}`;
+export function resolveAndPreloadAudio(
+  url: string,
+  charName?: string,
+): Promise<string | null> {
+  const key = `audio:${url}${charName ? `|${charName.toLowerCase()}` : ""}`;
   return cached(key, async () => {
+    // CDN character: prefer the sound from that character's CDN.
+    const cdn = await probeRemoteSound(charName, url);
+    if (cdn) {
+      await doPreloadAudio(cdn);
+      return cdn;
+    }
     const exists = await fileExists(url);
     if (!exists) return null;
     const resolvedUrl = resolveAssetUrl(url);
