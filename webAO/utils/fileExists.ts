@@ -1,4 +1,4 @@
-import { getLocalOverrideUrl } from "./resolveLocalAsset";
+import { getLocalOverrideUrl, getRemoteUrl } from "./resolveLocalAsset";
 
 const cache = new Map<string, Promise<boolean>>();
 
@@ -19,7 +19,7 @@ export default function fileExists(url: string): Promise<boolean> {
 
   const promise = new Promise<boolean>((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("HEAD", url);
+    xhr.open("HEAD", getRemoteUrl(url) ?? url);
     xhr.onload = function checkLoad() {
       if (xhr.readyState === 4) {
         resolve(xhr.status === 200);
