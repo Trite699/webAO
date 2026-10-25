@@ -3,6 +3,7 @@ import fileExists from "./fileExists";
 import { requestBuffer } from "../services/request";
 import {
   getLocalOverrideUrl,
+  resolveAssetUrl,
   parseCharacterAssetUrl,
   isLocalCharacterName,
 } from "./resolveLocalAsset";
@@ -23,7 +24,7 @@ const getAnimLength = async (url) => {
   const parsed = parseCharacterAssetUrl(url);
 
   // For a locally-imported character, resolve entirely from local storage,
-  // same as setEmote.ts does -- never touch the network. Without this, a
+  // same as setEmote.ts does never touch the network. Without this, a
   // local-only character (whose preanim is almost always just a plain
   // .gif) had to wait on two real, sequential, network round-trips (one
   // per extension NOT present locally) to a server that doesn't host it
@@ -51,7 +52,7 @@ const getAnimLength = async (url) => {
     if (existsPerExtension[i]) {
       const extension = extensions[i];
       const urlWithExtension = `${url}${extension}`;
-      const resolvedUrl = getLocalOverrideUrl(urlWithExtension) || urlWithExtension;
+      const resolvedUrl = resolveAssetUrl(urlWithExtension);
       const fileBuffer = await requestBuffer(resolvedUrl);
       return calculatorHandler[extension](fileBuffer);
     }
