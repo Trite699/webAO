@@ -30,5 +30,6 @@ declare global {
     useRemoteCharacter: (name: string) => void;
     deleteRemoteCharacterUI: (name: string) => void;
     toggleAcceptRemote: () => void;
+    toggleShareRemote: () => void;
   }
 }
