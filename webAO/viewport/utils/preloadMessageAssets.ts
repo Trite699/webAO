@@ -1,3 +1,4 @@
+import { probeRemoteSound } from "../../utils/remoteSounds";
 import { ChatMsg } from "../interfaces/ChatMsg";
 import { PreloadedAssets } from "../interfaces/PreloadedAssets";
 import {
@@ -117,10 +118,12 @@ export default async function preloadMessageAssets(
         ? getAnimDuration(`${AO_HOST}characters/${encodeURI(charName)}/${encodeURI(chatmsg.preanim!.toLowerCase())}`)
         : Promise.resolve(0),
       pairIdleUrls ? resolveAndPreloadImage(pairIdleUrls) : Promise.resolve(transparentPng),
-      shoutSfxPath ? resolveAndPreloadAudio(shoutSfxPath) : Promise.resolve(null),
-      emoteSfxPath ? resolveAndPreloadAudio(emoteSfxPath) : Promise.resolve(null),
-      resolveAndPreloadAudio(realizationPath),
-      resolveAndPreloadAudio(stabPath),
+      shoutSfxPath ? resolveAndPreloadAudio(shoutSfxPath, charName) : Promise.resolve(null),
+      emoteSfxPath ? resolveAndPreloadAudio(emoteSfxPath, charName) : Promise.resolve(null),
+      resolveAndPreloadAudio(realizationPath, charName),
+      resolveAndPreloadAudio(stabPath, charName),
+      // warm the blip lookup so the first blips already come from the CDN
+      probeRemoteSound(charName, `${AO_HOST}sounds/blips/${encodeURI((chatmsg.blips || "male").toLowerCase())}.opus`),
     ]);
 
     return {
