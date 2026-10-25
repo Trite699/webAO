@@ -1,4 +1,19 @@
-import { getLocalOverrideUrl, getRemoteUrl } from "./resolveLocalAsset";
+import {
+  getLocalOverrideUrl,
+  getRemoteUrl,
+  getRemoteUrlVariants,
+} from "./resolveLocalAsset";
+import { rememberRemotePath } from "./remoteCharacterStore";
+
+function headOk(target: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("HEAD", target);
+    xhr.onload = () => resolve(xhr.readyState === 4 && xhr.status === 200);
+    xhr.onerror = () => resolve(false);
+    xhr.send(null);
+  });
+}
 
 const cache = new Map<string, Promise<boolean>>();
 
@@ -17,19 +32,17 @@ export default function fileExists(url: string): Promise<boolean> {
     return promise;
   }
 
-  const promise = new Promise<boolean>((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("HEAD", getRemoteUrl(url) ?? url);
-    xhr.onload = function checkLoad() {
-      if (xhr.readyState === 4) {
-        resolve(xhr.status === 200);
+  const promise = (async () => {
+    if (await headOk(getRemoteUrl(url) ?? url)) return true;
+    // Case-sensitive fix
+    for (const v of getRemoteUrlVariants(url)) {
+      if (await headOk(v.url)) {
+        rememberRemotePath(v.name, v.path);
+        return true;
       }
-    };
-    xhr.onerror = function checkError() {
-      resolve(false);
-    };
-    xhr.send(null);
-  });
+    }
+    return false;
+  })();
 
   // Only cache successful lookups permanently. A transient failure (slow
   // response, DNS hiccup, server blip) would otherwise be cached forever
