@@ -15,7 +15,7 @@ import findImgSrc from "./findImgSrc";
 import fileExists from "./fileExists";
 import getAnimLength from "./getAnimLength";
 import transparentPng from "../constants/transparentPng";
-import { getLocalOverrideUrl } from "./resolveLocalAsset";
+import { resolveAssetUrl } from "./resolveLocalAsset";
 
 const PRELOAD_TIMEOUT_MS = 5000;
 const AUDIO_PRELOAD_TIMEOUT_MS = 3000;
@@ -62,7 +62,7 @@ export function resolveAndPreloadAudio(url: string): Promise<string | null> {
   return cached(key, async () => {
     const exists = await fileExists(url);
     if (!exists) return null;
-    const resolvedUrl = getLocalOverrideUrl(url) ?? url;
+    const resolvedUrl = resolveAssetUrl(url);
     await doPreloadAudio(resolvedUrl);
     return resolvedUrl;
   });
