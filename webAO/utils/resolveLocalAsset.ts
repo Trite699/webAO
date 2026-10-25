@@ -1,4 +1,5 @@
 import { getLocalCharacterSync } from "./localCharacterStore";
+import { getRemoteCharacter } from "./remoteCharacterStore";
 
 // Object URLs are cheap to create but should be created once per blob and
 // reused, rather than minted fresh (and leaked) on every lookup.
@@ -26,7 +27,7 @@ export function resolveLocalFile(
   // --- DOUBLE-PREFIX FIX ---
   // If webAO prepends (a) or (b) to an emote name that ALREADY starts with (a) or (b)
   // (e.g. requesting "(a)(a)lobster.gif" for an INI entry defined as "(a)lobster"),
-  // strip the extra wrapper and look up the real file "(a)lobster.gif".
+  // strip the extra wrapper and look up the real file "(a)lobster.gif" fucking hell.
   if (!blob) {
     const doublePrefixMatch = /^(\(a\)|\(b\))(\(a\)|\(b\))(.+)$/.exec(key);
     if (doublePrefixMatch) {
@@ -171,7 +172,7 @@ export function getLocalOverrideUrl(url: string): string | null {
       `[webAO DEBUG] "${parsed.charactername}" is NOT recognized as a locally-imported character ` +
       `(getLocalCharacterSync returned nothing) -- for URL: ${url}`,
     );
-    return null; // not a locally-imported character -- fall through silently
+    return null; // not a locally-imported character so fall through silently
   }
 
   const resolved = resolveLocalFile(parsed.charactername, parsed.filename);
@@ -196,4 +197,25 @@ export function getLocalIconUrl(
     if (url) return url;
   }
   return null;
+}
+
+/**
+ * If the URL is a "characters/<name>/<file>" URL for a registered remote
+ * (CDN) character, returns the equivalent URL on that CDN; otherwise null.
+ * Local zip imports take priority, so callers check getLocalOverrideUrl first.
+ * This does NOT imply the file exists callers still probe if it exists.
+ */
+export function getRemoteUrl(url: string): string | null {
+  const parsed = parseCharacterAssetUrl(url);
+  if (!parsed) return null;
+  const remote = getRemoteCharacter(parsed.charactername);
+  if (!remote) return null;
+  if (getLocalCharacterSync(parsed.charactername)) return null;
+  const path = parsed.filename.split("?")[0].split("/").map(encodeURIComponent).join("/");
+  return `${remote.base}${path}`;
+}
+
+/** Local override, else remote CDN rewrite, else the URL unchanged. */
+export function resolveAssetUrl(url: string): string {
+  return getLocalOverrideUrl(url) ?? getRemoteUrl(url) ?? url;
 }
