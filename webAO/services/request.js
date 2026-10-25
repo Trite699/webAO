@@ -1,3 +1,5 @@
+import { getRemoteUrl } from "../utils/resolveLocalAsset";
+
 /**
  * Make a GET request for a specific URI.
  * @param {string} url the URI to be requested
@@ -29,7 +31,7 @@ export async function requestBuffer(url) {
         resolve(xhr.response);
       }
     });
-    xhr.open("GET", url, true);
+    xhr.open("GET", getRemoteUrl(url) ?? url, true);
     xhr.send();
   });
 }
@@ -65,7 +67,7 @@ export const request = async (url) =>
         resolve(xhr.response);
       }
     });
-    xhr.open("GET", url, true);
+    xhr.open("GET", getRemoteUrl(url) ?? url, true);
     xhr.send();
   });
 export default request;
