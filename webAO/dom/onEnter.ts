@@ -1,3 +1,4 @@
+import { encodeRemoteName } from "../utils/remoteCharacterStore";
 import { client, selectedShout, selectedCustomShout } from "../client";
 import { formatObjectionField } from "../viewport/utils/customShouts";
 import { escapeChat } from "../encoding";
@@ -117,7 +118,7 @@ export function onEnter(event: KeyboardEvent) {
     client.sender.sendIC(
       myemo.deskmod,
       myemo.preanim,
-      mychar.name,
+      encodeRemoteName(mychar.name),
       myemo.emote,
       text,
       myrole,
