@@ -1,5 +1,6 @@
 /* eslint indent: ["error", 2, { "SwitchCase": 1 }] */
 
+import { resolveSoundUrl } from "../utils/remoteSounds";
 import { client, delay } from "../client";
 import { UPDATE_INTERVAL } from "../client";
 import setEmote from "../client/setEmote";
@@ -551,7 +552,7 @@ const viewport = (): Viewport => {
             sfxplayed = 1;
             const sfxUrl =
               chatmsg.preloadedAssets?.emoteSfxUrl ??
-              `${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`;
+              resolveSoundUrl(`${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`, chatmsg.name);
             playSFX(sfxUrl, chatmsg.looping_sfx);
           }
           if (chatmsg.preloadedAssets) {
@@ -592,7 +593,7 @@ const viewport = (): Viewport => {
         (chatmsg.type == 1 || chatmsg.type == 2 || chatmsg.type == 5 || chatmsg.type == 6)
       ) {
         const sfxUrl = chatmsg.preloadedAssets?.emoteSfxUrl
-          ?? `${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`;
+          ?? resolveSoundUrl(`${AO_HOST}sounds/general/${encodeURI(chatmsg.sound.toLowerCase())}.opus`, chatmsg.name);
         playSFX(sfxUrl, chatmsg.looping_sfx);
       }
     }
