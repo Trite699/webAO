@@ -11,7 +11,7 @@
  */
 import { AO_HOST } from "../../client/aoHost";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
-import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { resolveAssetUrl } from "../../utils/resolveLocalAsset";
 
 type FrameMap = Map<number, string>;
 
@@ -156,7 +156,7 @@ function playFrameSfx(name: string): void {
   // SFX is silent.
   const sourceFor = (ext: string): string => {
     const url = `${base}${ext}`;
-    return getLocalOverrideUrl(url) ?? url;
+    return resolveAssetUrl(url);
   };
   const a = new Audio(sourceFor(".opus"));
   // Respect the SFX volume setting (the main SFX audio element holds it).
