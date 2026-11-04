@@ -26,3 +26,52 @@ export function extractPoseTags(text: string): { text: string; tags: PoseTag[] }
   out += text.slice(last);
   return { text: out, tags };
 }
+
+/** One outgoing IC message produced by splitting on `<pose:N>` tags. */
+export interface PoseSegment {
+  text: string;
+  /** Pose to use for this segment, or null for the emote picked with the buttons */
+  pose: number | null;
+}
+
+/**
+ * Splits a message you are about to send at its `<pose:N>` tags, so each part
+ * can go out as its own IC message with that pose's emote, preanim, sounds
+ * and frame effects. Tags for poses that don't exist (isValid returns false)
+ * are removed but don't split anything. A pose with no text after it (empty
+ * or whitespace-only) is dropped, and whitespace is kept attached to the
+ * neighbouring text.
+ */
+export function splitByPoseTags(
+  text: string,
+  isValid: (pose: number) => boolean,
+): PoseSegment[] {
+  const { text: stripped, tags } = extractPoseTags(text);
+  const valid = tags.filter((t) => isValid(t.pose));
+
+  const pieces: PoseSegment[] = [];
+  let pos = 0;
+  let pose: number | null = null;
+  valid.forEach((t) => {
+    pieces.push({ text: stripped.slice(pos, t.at), pose });
+    pos = t.at;
+    pose = t.pose;
+  });
+  pieces.push({ text: stripped.slice(pos), pose });
+
+  const segments: PoseSegment[] = [];
+  let pendingPose: number | null = null;
+  let carry = "";
+  pieces.forEach((piece) => {
+    if (piece.pose !== null) pendingPose = piece.pose;
+    if (piece.text.trim() === "") {
+      if (segments.length) segments[segments.length - 1].text += piece.text;
+      else carry += piece.text;
+      return;
+    }
+    segments.push({ text: carry + piece.text, pose: pendingPose });
+    carry = "";
+    pendingPose = null;
+  });
+  return segments;
+}
