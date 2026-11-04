@@ -23,6 +23,7 @@ import { COLORS } from "../constants/colors";
 import mlConfig from "../../utils/aoml";
 import request from "../../services/request";
 import preloadMessageAssets from "./preloadMessageAssets";
+import { resolvePoseChanges } from "./poseTags";
 import { resolveAndPreloadImage, resolveAndPreloadAudio } from "../../utils/assetCache";
 import { stopFrameEffects, primeFrameOffsets } from "./frameEffects";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
@@ -610,6 +611,16 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
     client.emote_extensions,
   );
   client.viewport.getChatmsg().preloadedAssets = preloaded;
+
+  // Resolve any <pose:N> tags in the text against the speaker's char.ini and
+  // preload their sprites so the mid-text swap is instant.
+  {
+    const msg = client.viewport.getChatmsg();
+    msg.poseIndex = 0;
+    msg.poseChanges = msg.poseTags?.length
+      ? await resolvePoseChanges(msg, msg.poseTags, AO_HOST, client.emote_extensions)
+      : [];
+  }
 
   // Prime the frame-timing cache for every phase NOW (fire-and-forget), so
   // that when startFramePhase runs -- especially the idle phase at
