@@ -15,7 +15,7 @@ const GLOBAL_TIMEOUT_MS = 8000;
  * Builds the list of candidate URLs for a character emote across all extensions.
  * Replicates the URL construction logic from setEmote.ts.
  */
-function buildEmoteUrls(
+export function buildEmoteUrls(
   AO_HOST: string,
   extensions: string[],
   charactername: string,
