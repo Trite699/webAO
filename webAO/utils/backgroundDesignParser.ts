@@ -1,4 +1,4 @@
-import { getLocalCharacterSync } from "./localCharacterStore";
+import { getLocalCharacterSync } from "../../utils/localCharacterStore";
 import { AO_HOST } from "../../client/aoHost";
 
 export async function getBackgroundDesignIni(bgname: string): Promise<Record<string, any> | null> {
