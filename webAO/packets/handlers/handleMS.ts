@@ -5,7 +5,8 @@ import { parseObjectionField } from "../../viewport/utils/customShouts";
 import { handleCharacterInfo, ensureCharIni } from "../../client/handleCharacterInfo";
 import { resetICParams } from "../../client/resetICParams";
 import { sanitizeBlipName } from "../../client/blipOverride";
-import { prepChat, safeTags } from "../../encoding";
+import { prepChat, safeTags, decodeChat, unescapeChat } from "../../encoding";
+import { extractPoseTags } from "../../viewport/utils/poseTagParser";
 import { ingestRemoteName } from "../../utils/remoteCharacterStore";
 import { handle_ic_speaking } from "../../viewport/utils/handleICSpeaking";
 /**
@@ -75,6 +76,11 @@ export const handleMS = (args: string[]) => {
           ? 1
           : Number(rawDeskmod);
 
+      // Pull <pose:N> tags out before the text is escaped/parsed
+      const poseExtract = extractPoseTags(
+        unescapeChat(decodeChat(args[5])),
+      );
+
       let chatmsg = {
         deskmod,
         preanim: safeTags(args[2]).toLowerCase(), // get preanim
@@ -82,7 +88,8 @@ export const handleMS = (args: string[]) => {
         chatbox: char_chatbox,
         name: char_name,
         sprite: safeTags(args[4]).toLowerCase(),
-        content: prepChat(args[5]), // Escape HTML tags
+        content: safeTags(poseExtract.text), // Escape HTML tags
+        poseTags: poseExtract.tags,
         side: args[6].toLowerCase(),
         sound: safeTags(args[7]).toLowerCase(),
         blips: safeTags(msg_blips),
