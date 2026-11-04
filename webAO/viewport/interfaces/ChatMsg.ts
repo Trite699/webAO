@@ -39,6 +39,9 @@ export interface ChatMsg {
   noninterrupting_preanim?: number;
   preloadedAssets?: PreloadedAssets;
   charid?: number;
+  frame_screenshake?: string;
+  frame_realization?: string;
+  frame_sfx?: string;
   /** `<pose:N>` tags pulled out of the text, before they are resolved */
   poseTags?: PoseTag[];
   /** Resolved mid-text animation changes, in text order */
