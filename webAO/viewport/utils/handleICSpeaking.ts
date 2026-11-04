@@ -518,7 +518,12 @@ export const setStartThirdTickCheck = (val: boolean) => {
  * TODO: the preanim logic, on the other hand, should probably be moved to tick()
  * @param playerChatMsg the new chat message
  */
+let icMessageCount = 0;
+/** How many IC messages the viewport has started playing (used to wait for our own echo) */
+export const getIcMessageCount = () => icMessageCount;
+
 export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
+  icMessageCount += 1;
   client.viewport.setChatmsg(playerChatMsg);
   client.viewport.setTextNow("");
   client.viewport.setSfxPlayed(0);
