@@ -11,4 +11,11 @@ export interface PoseChange {
   preanimUrl: string;
   /** Preanim length in ms (0 = no preanim) */
   preanimDuration: number;
+  /** Packed per-frame effects for this pose, same format as ChatMsg.frame_* */
+  frameSfx: string;
+  frameScreenshake: string;
+  frameRealization: string;
+  /** The pose's own emote sound (SoundN) and its delay in ms (SoundT * 40) */
+  sound: string;
+  soundDelay: number;
 }
