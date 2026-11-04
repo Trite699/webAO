@@ -196,6 +196,7 @@ const viewport = (): Viewport => {
   // sprites are also written into preloadedAssets so every "message finished"
   // path settles on the new pose instead of the one the message started with.
   let poseTimer: ReturnType<typeof setTimeout> | undefined;
+  let poseSfxTimer: ReturnType<typeof setTimeout> | undefined;
   const applyPoseChanges = (revealed: number) => {
     const changes = chatmsg.poseChanges;
     if (!changes || !chatmsg.preloadedAssets) return;
@@ -207,29 +208,59 @@ const viewport = (): Viewport => {
       chatmsg.poseIndex = (chatmsg.poseIndex ?? 0) + 1;
 
       clearTimeout(poseTimer);
-      stopFrameEffects(); // frame SFX of the previous sprite no longer apply
+      clearTimeout(poseSfxTimer);
+      // Frame effects of the previous sprite no longer apply: drop them and
+      // swap the message's frame data for the new pose's, so the preanim /
+      // talking / idle phases below (and the idle phase at message end) fire
+      // the new pose's FrameSFX, FrameScreenshake and FrameRealization.
+      stopFrameEffects();
+      chatmsg.frame_sfx = pose.frameSfx;
+      chatmsg.frame_screenshake = pose.frameScreenshake;
+      chatmsg.frame_realization = pose.frameRealization;
+
       chatmsg.sprite = pose.sprite;
       chatmsg.preloadedAssets.idleUrl = pose.idleUrl;
       chatmsg.preloadedAssets.talkingUrl = pose.talkingUrl;
 
       const msg = chatmsg;
       const side = chatmsg.side;
+
+      // The pose's own emote sound (SoundN / SoundT in char.ini)
+      if (pose.sound && pose.sound !== "0" && pose.sound !== "1") {
+        poseSfxTimer = setTimeout(() => {
+          if (chatmsg !== msg) return;
+          playSFX(
+            resolveSoundUrl(
+              `${AO_HOST}sounds/general/${encodeURI(pose.sound)}.opus`,
+              msg.name,
+            ),
+            false,
+          );
+        }, pose.soundDelay);
+      }
+
       if (pose.preanimDuration > 0) {
         setEmoteFromUrl(pose.preanimUrl, false, side);
+        startFramePhase(FRAME_PHASE.preanim, pose.preanimUrl, chatmsg);
         // Swap to the talking sprite just before the preanim ends (same lead
         // idea as the main preanim: infinite-looping preanims would flash
         // their first frame again if we waited for the exact end).
         const lead = Math.min(UPDATE_INTERVAL * 1.5, pose.preanimDuration * 0.4);
         poseTimer = setTimeout(() => {
           if (chatmsg !== msg) return; // a newer message took over
-          setEmoteFromUrl(
-            textnow === msg.content ? pose.idleUrl : pose.talkingUrl,
-            false,
-            side,
-          );
+          if (textnow === msg.content) {
+            // text already finished: settle on idle (end-of-message code
+            // will not run again), with its frame effects
+            setEmoteFromUrl(pose.idleUrl, false, side);
+            startFramePhase(FRAME_PHASE.idle, pose.idleUrl, msg, true);
+          } else {
+            setEmoteFromUrl(pose.talkingUrl, false, side);
+            startFramePhase(FRAME_PHASE.talking, pose.talkingUrl, msg, true);
+          }
         }, Math.max(0, pose.preanimDuration - lead));
       } else {
         setEmoteFromUrl(pose.talkingUrl, false, side);
+        startFramePhase(FRAME_PHASE.talking, pose.talkingUrl, chatmsg, true);
       }
     }
   };
