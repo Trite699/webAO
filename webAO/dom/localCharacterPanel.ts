@@ -36,6 +36,24 @@ export function renderLocalCharacterList(): void {
 }
 window.renderLocalCharacterList = renderLocalCharacterList;
 
+/**
+ * Backgrounds are applied when the server sends a BN packet, which may have
+ * happened BEFORE the zip was imported. Re-apply the current background so a
+ * freshly imported local background (and its design.ini positions / slide
+ * panorama) shows up immediately instead of only after the next BN.
+ */
+async function refreshBackgroundAfterImport(): Promise<void> {
+  try {
+    const { client } = await import("../client");
+    const bgName = client?.viewport?.getBackgroundName?.();
+    if (!bgName) return;
+    const { handleBN } = await import("../packets/handlers/handleBN");
+    handleBN(["BN", bgName]);
+  } catch (err) {
+    console.warn("[local base] Couldn't refresh the current background:", err);
+  }
+}
+
 export async function importLocalCharacterZip(): Promise<void> {
   const fileInput = <HTMLInputElement>(
     document.getElementById("local_char_zip_input")
@@ -59,6 +77,7 @@ export async function importLocalCharacterZip(): Promise<void> {
       ? await importCharacterZipFile(file)
       : await importZipFromUrl(url!, (message) => setStatus(message, false));
     setStatus(`Imported "${name}".`, false);
+    await refreshBackgroundAfterImport();
     if (fileInput) fileInput.value = "";
     if (urlInput) urlInput.value = "";
     renderLocalCharacterList();
