@@ -34,6 +34,13 @@ let db: IDBDatabase | null = null;
 const memoryCache = new Map<string, LocalCharacterRecord>();
 let initPromise: Promise<void> | null = null;
 
+// Bumped on every save/delete so derived caches (e.g. "does this background
+// have a panorama?") can tell that locally imported assets changed.
+let storeVersion = 0;
+export function getLocalStoreVersion(): number {
+  return storeVersion;
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -69,6 +76,7 @@ export function initLocalCharacterStore(): Promise<void> {
       memoryCache.clear();
       for (const record of records) {
         memoryCache.set(record.name, record);
+  storeVersion++;
       }
     } catch (err) {
       console.warn("Local character store unavailable:", err);
@@ -94,6 +102,7 @@ export async function saveLocalCharacter(
 export async function deleteLocalCharacter(name: string): Promise<void> {
   const key = name.toLowerCase();
   memoryCache.delete(key);
+  storeVersion++;
   if (!db) await initLocalCharacterStore();
   if (!db) return;
   await new Promise<void>((resolve, reject) => {
