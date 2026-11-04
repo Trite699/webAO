@@ -28,6 +28,9 @@ import { stopFrameEffects, primeFrameOffsets } from "./frameEffects";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
 import fileExists from "../../utils/fileExists";
+import { getLocalOverrideUrl } from "../../utils/resolveLocalAsset";
+import { getLocalStoreVersion } from "../../utils/localCharacterStore";
+import { getBackgroundDesignIni } from "./backgroundDesignParser";
 import { getEffectProps, EffectLayer } from "../../utils/effectsIni";
 import getAnimLoopCount, {
   INFINITE_LOOP,
@@ -404,19 +407,43 @@ function effectLayerElement(layer: EffectLayer): HTMLElement {
   return fgLayer;
 }
 
-// Whether the CURRENT background has a panorama (court.png) or panorama desk
-// overlay (court_overlay.png). AO2 only pans the camera between positions for
-// panorama-style backgrounds; classic backgrounds (separate def/pro/wit
-// images) hard-cut instead, because there's no continuous image to slide
-// across. Cached per background folder so we probe at most once per room.
+// Whether the CURRENT background can be panned across. AO2 only pans the
+// camera between positions for panorama-style backgrounds; classic
+// backgrounds (separate def/pro/wit images) hard-cut instead, because there's
+// no continuous image to slide across. A background counts as pannable if:
+//   - it has a panorama (court.*) or panorama desk overlay (court_overlay.*),
+//     either on the server OR in a locally imported zip (any image format), or
+//   - its design.ini (server or local) defines a position with an origin.
+// Cached per background folder, but the cache is dropped whenever locally
+// imported assets change, so importing a background zip takes effect at once.
+const PANORAMA_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif", ".apng"];
 let _panoramaFolder: string | null = null;
+let _panoramaStoreVersion = -1;
 let _panoramaHas = false;
 const backgroundHasPanorama = async (): Promise<boolean> => {
   const folder = client.viewport.getBackgroundFolder();
-  if (folder === _panoramaFolder) return _panoramaHas;
+  const version = getLocalStoreVersion();
+  if (folder === _panoramaFolder && version === _panoramaStoreVersion) {
+    return _panoramaHas;
+  }
   _panoramaFolder = folder;
+  _panoramaStoreVersion = version;
   _panoramaHas = false;
-  for (const stem of ["court", "court_overlay"]) {
+
+  const stems = ["court", "court_overlay"];
+
+  // 1. Locally imported background (checked for every image extension).
+  for (const stem of stems) {
+    for (const ext of PANORAMA_EXTS) {
+      if (getLocalOverrideUrl(`${folder}${stem}${ext}`)) {
+        _panoramaHas = true;
+        return true;
+      }
+    }
+  }
+
+  // 2. Server background, using the server's advertised extensions.
+  for (const stem of stems) {
     for (const ext of client.background_extensions) {
       if (await fileExists(`${folder}${stem}${ext}`)) {
         _panoramaHas = true;
@@ -424,7 +451,22 @@ const backgroundHasPanorama = async (): Promise<boolean> => {
       }
     }
   }
-  return false;
+
+  // 3. A design.ini with an origin on any position implies a panorama.
+  try {
+    const designIni = await getBackgroundDesignIni(client.viewport.getBackgroundName());
+    if (designIni) {
+      _panoramaHas = Object.entries(designIni).some(
+        ([section, values]) =>
+          section.startsWith("court:") &&
+          values &&
+          (values as Record<string, unknown>).origin !== undefined,
+      );
+    }
+  } catch {
+    /* no design.ini -- not pannable */
+  }
+  return _panoramaHas;
 };
 
 
