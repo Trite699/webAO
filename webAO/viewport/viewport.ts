@@ -189,12 +189,59 @@ const viewport = (): Viewport => {
   );
   const textSpeedChars = new Set(["{", "}"]);
 
+  // <pose:N> support ---------------------------------------------------
+  // Fires every pending pose change whose text position has been reached.
+  // The pose's preanim (if any) plays first, then the sprite switches to the
+  // pose's talking sprite for the rest of the message. The pose's idle/talking
+  // sprites are also written into preloadedAssets so every "message finished"
+  // path settles on the new pose instead of the one the message started with.
+  let poseTimer: ReturnType<typeof setTimeout> | undefined;
+  const applyPoseChanges = (revealed: number) => {
+    const changes = chatmsg.poseChanges;
+    if (!changes || !chatmsg.preloadedAssets) return;
+    while (
+      (chatmsg.poseIndex ?? 0) < changes.length &&
+      changes[chatmsg.poseIndex ?? 0].at <= revealed
+    ) {
+      const pose = changes[chatmsg.poseIndex ?? 0];
+      chatmsg.poseIndex = (chatmsg.poseIndex ?? 0) + 1;
+
+      clearTimeout(poseTimer);
+      stopFrameEffects(); // frame SFX of the previous sprite no longer apply
+      chatmsg.sprite = pose.sprite;
+      chatmsg.preloadedAssets.idleUrl = pose.idleUrl;
+      chatmsg.preloadedAssets.talkingUrl = pose.talkingUrl;
+
+      const msg = chatmsg;
+      const side = chatmsg.side;
+      if (pose.preanimDuration > 0) {
+        setEmoteFromUrl(pose.preanimUrl, false, side);
+        // Swap to the talking sprite just before the preanim ends (same lead
+        // idea as the main preanim: infinite-looping preanims would flash
+        // their first frame again if we waited for the exact end).
+        const lead = Math.min(UPDATE_INTERVAL * 1.5, pose.preanimDuration * 0.4);
+        poseTimer = setTimeout(() => {
+          if (chatmsg !== msg) return; // a newer message took over
+          setEmoteFromUrl(
+            textnow === msg.content ? pose.idleUrl : pose.talkingUrl,
+            false,
+            side,
+          );
+        }, Math.max(0, pose.preanimDuration - lead));
+      } else {
+        setEmoteFromUrl(pose.talkingUrl, false, side);
+      }
+    }
+  };
+
   const handleTextTick = async (charLayers: HTMLImageElement) => {
     const chatBox = document.getElementById("client_chat");
     const waitingBox = document.getElementById("client_chatwaiting");
     const chatBoxInner = document.getElementById("client_inner_chat");
     const charName = chatmsg.name.toLowerCase();
     const charEmote = chatmsg.sprite.toLowerCase();
+
+    applyPoseChanges(textnow.length);
 
     if (chatmsg.content.charAt(textnow.length) !== " ") {
       blipChannels[currentBlipChannel].play().catch(() => {});
@@ -263,6 +310,7 @@ const viewport = (): Viewport => {
     chatBox.scrollTop = chatBox.scrollHeight;
 
     if (textnow === chatmsg.content) {
+      applyPoseChanges(textnow.length); // tags sitting at the very end
       animating = false;
       if (chatmsg.preloadedAssets) {
         setEmoteFromUrl(chatmsg.preloadedAssets.idleUrl, false, chatmsg.side);
