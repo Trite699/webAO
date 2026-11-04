@@ -5,6 +5,7 @@ import { resolveAndPreloadImage, getAnimDuration } from "../../utils/assetCache"
 import transparentPng from "../../constants/transparentPng";
 import { buildEmoteUrls } from "./preloadMessageAssets";
 import { PoseTag } from "./poseTagParser";
+import { primeFrameOffsets } from "./frameEffects";
 
 /**
  * Looks each tag's pose up in the speaker's char.ini ([Emotions] N =
@@ -51,7 +52,34 @@ export async function resolvePoseChanges(
                 ? getAnimDuration(`${AO_HOST}characters/${encodeURI(charName)}/${encodeURI(preanim)}`)
                 : Promise.resolve(0),
             ]);
-          return { pose, sprite, idleUrl, talkingUrl, preanimUrl, preanimDuration };
+          // Per-frame effects (FrameSFX / FrameScreenshake / FrameRealization)
+          // live in char.ini as one section per animation, e.g.
+          // "[name_FrameSFX]". Pack them the same way handlePV does for the
+          // emote buttons: one segment per phase (preanim ^ talking ^ idle).
+          const pack = (suffix: string): string => {
+            const parts = [preanim, sprite, sprite].map((name) => {
+              const sec = ini[`${name}_${suffix}`];
+              if (!hasPreanim && name === preanim) return "";
+              if (!sec) return "";
+              return Object.entries(sec)
+                .map(([frame, val]) => `${frame}=${String(val).trim()}`)
+                .join("|");
+            });
+            return parts.every((p) => p === "")
+              ? ""
+              : `${parts.map((p) => `|${p}`).join("^")}^`;
+          };
+          const sound = String(ini.soundn?.[pose] ?? "0").trim().toLowerCase();
+          const soundDelay = (Number(String(ini.soundt?.[pose] ?? "0").trim()) || 0) * 40;
+
+          [preanimUrl, talkingUrl, idleUrl].forEach((u) => u && primeFrameOffsets(u));
+          return {
+            pose, sprite, idleUrl, talkingUrl, preanimUrl, preanimDuration,
+            frameSfx: pack("framesfx"),
+            frameScreenshake: pack("framescreenshake"),
+            frameRealization: pack("framerealization"),
+            sound, soundDelay,
+          };
         })(),
       );
     }
