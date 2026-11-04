@@ -1,6 +1,7 @@
 import { selectedShout, setSelectedShout } from "../client";
 import { hidePickerUI } from "./customShoutPicker";
 import { stopTypingNow } from "../dom/updateTypingIndicator";
+import { isFollowUpInFlight } from "./segmentedSend";
 
 /**
  * Resets the IC parameters for the player to enter a new chat message.
@@ -8,6 +9,8 @@ import { stopTypingNow } from "../dom/updateTypingIndicator";
  * was successfully sent/presented.
  */
 export function resetICParams() {
+  // A later <pose:N> segment is being sent: keep what the player is typing
+  if (isFollowUpInFlight()) return;
   (<HTMLInputElement>document.getElementById("client_inputbox")).value = "";
   stopTypingNow();
   document.getElementById("button_flash")!.className = "client_button";
