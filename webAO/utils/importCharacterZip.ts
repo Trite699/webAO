@@ -2,6 +2,9 @@ import JSZip from "jszip";
 import iniParse from "../iniParse";
 import { saveLocalCharacter, getLocalCharacterSync } from "./localCharacterStore";
 
+/** Matches "<sounds|background|evidence>/..." at the start or after a "/". */
+const BASE_FOLDER_RE = /(?:^|\/)((?:sounds|background|evidence)\/.+)$/;
+
 function basename(path: string): string {
   return path.split("/").pop() || path;
 }
@@ -66,31 +69,37 @@ async function importUniversalZipBlob(blob: Blob, fallbackName: string): Promise
     console.log(`[local character] Imported: ${resolvedName}`);
   }
 
-  // --- 2. IMPORT BASE ASSETS ---
+  // --- 2. IMPORT BASE ASSETS (backgrounds / sounds / evidence) ---
   const baseFiles: Record<string, Blob> = {};
-  let baseFound = false;
+  const backgroundNames = new Set<string>();
+  const charRoots = iniEntries
+    .map((ini) => ini.name.slice(0, -"char.ini".length).toLowerCase())
+    .filter((root) => root !== ""); // a char.ini at the zip root owns nothing exclusively
 
   for (const entry of entries) {
     const lowerName = entry.name.toLowerCase();
-    
-    // If this file was already imported as part of a character, skip it
-    const belongsToChar = iniEntries.some(ini => 
-      lowerName.startsWith(ini.name.slice(0, -"char.ini".length).toLowerCase())
-    );
-    if (belongsToChar) continue;
+    if (lowerName.startsWith("__macosx/")) continue;
 
-    // Check if it's a global asset (sounds, backgrounds, evidence)
-    const match = lowerName.match(/(sounds|background|evidence)\/.*$/i);
-    if (match) {
-      const relativePath = match[0];
-      const rawData = await entry.async("arraybuffer");
-      baseFiles[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
-      baseFound = true;
-      importedBaseFiles++;
-    }
+    // Anchor to a real path segment so "mybackground/x.png" isn't picked up,
+    // and so a wrapper folder ("MyPack/background/lob/court.png") is stripped.
+    const match = BASE_FOLDER_RE.exec(lowerName);
+    if (!match) continue;
+    const relativePath = match[1];
+    const parts = relativePath.split("/");
+    const folder = parts[0];
+
+    // Files inside a character's own folder belong to that character --
+    // except a background/ folder, which is always a global asset.
+    const belongsToChar = charRoots.some((root) => lowerName.startsWith(root));
+    if (belongsToChar && folder !== "background") continue;
+
+    const rawData = await entry.async("arraybuffer");
+    baseFiles[relativePath] = new Blob([rawData], { type: getMimeType(relativePath) });
+    importedBaseFiles++;
+    if (folder === "background" && parts.length > 2) backgroundNames.add(parts[1]);
   }
 
-  if (baseFound) {
+  if (importedBaseFiles > 0) {
     // Merge with existing base files so we don't overwrite previous uploads!
     const existingBase = getLocalCharacterSync("__base__");
     const mergedFiles = existingBase ? { ...existingBase.files, ...baseFiles } : baseFiles;
@@ -101,7 +110,11 @@ async function importUniversalZipBlob(blob: Blob, fallbackName: string): Promise
       iniText: "",
       files: mergedFiles,
     });
-    console.log(`[local base] Imported ${importedBaseFiles} global assets.`);
+    console.log(
+      `[local base] Imported ${importedBaseFiles} global assets` +
+        (backgroundNames.size ? ` (backgrounds: ${[...backgroundNames].join(", ")})` : "") +
+        ".",
+    );
   }
 
   // Create a nice summary message
@@ -109,12 +122,17 @@ async function importUniversalZipBlob(blob: Blob, fallbackName: string): Promise
     throw new Error("No characters or base assets (sounds/backgrounds) found in this zip!");
   }
   
+  const baseLabel =
+    backgroundNames.size > 0
+      ? `${backgroundNames.size} background(s) (${importedBaseFiles} base files)`
+      : `${importedBaseFiles} base file(s)`;
+
   if (importedChars > 0 && importedBaseFiles > 0) {
-    return `Imported ${importedChars} character(s) and ${importedBaseFiles} base files!`;
+    return `Imported ${importedChars} character(s) and ${baseLabel}!`;
   } else if (importedChars > 0) {
     return `Imported ${importedChars} character(s) successfully!`;
   } else {
-    return `Imported ${importedBaseFiles} base asset(s) successfully!`;
+    return `Imported ${baseLabel} successfully!`;
   }
 }
 
@@ -290,10 +308,33 @@ async function fetchDirectZipBytes(
   return bytes;
 }
 
+const DISCORD_CDN_HOST = /(^|\.)(cdn\.discordapp\.com|media\.discordapp\.net|cdn\.discordapp\.net)$/;
+
+/**
+ * Discord attachment links are signed: `?ex=<hex unix expiry>&is=<hex>&hm=<hmac>`
+ * and stop working after roughly a day. Returns the expiry as a Date, or null
+ * if the link has no (valid) `ex` parameter.
+ */
+export function getDiscordLinkExpiry(parsed: URL): Date | null {
+  const ex = parsed.searchParams.get("ex");
+  if (!ex || !/^[0-9a-f]+$/i.test(ex)) return null;
+  const seconds = parseInt(ex, 16);
+  return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
+}
+
+/** Trims whitespace, wrapping <...>/quotes and dangling "&"/"?" from pasted links. */
+function cleanPastedUrl(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^[<"']+|[>"']+$/g, "")
+    .replace(/[&?]+$/, "");
+}
+
 export async function importZipFromUrl(
   url: string,
   onStatus?: ImportStatusCallback,
 ): Promise<string> {
+  url = cleanPastedUrl(url);
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -303,6 +344,7 @@ export async function importZipFromUrl(
 
   const isGoogleDrive = /(^|\.)(drive|docs)\.google\.com$/.test(parsed.hostname);
   const driveFileId = isGoogleDrive ? extractGoogleDriveFileId(parsed) : null;
+  const isDiscord = DISCORD_CDN_HOST.test(parsed.hostname);
 
   if (isGoogleDrive && !driveFileId) {
     throw new Error(
@@ -310,14 +352,40 @@ export async function importZipFromUrl(
     );
   }
 
-  const bytes = driveFileId
-    ? await fetchGoogleDriveZipBytes(driveFileId, onStatus)
-    : await fetchDirectZipBytes(url, onStatus);
+  if (isDiscord) {
+    const expiry = getDiscordLinkExpiry(parsed);
+    if (expiry && expiry.getTime() < Date.now()) {
+      throw new Error(
+        `That Discord link expired on ${expiry.toLocaleString()}. Discord attachment links only last about a day -- ` +
+          "right-click the attachment in Discord, copy a fresh link and paste it here.",
+      );
+    }
+    onStatus?.("Fetching from Discord…");
+  }
 
-  const fallbackName = (url.split("/").pop()?.split("?")[0] || "Imported Pack").replace(
-    /\.zip$/i,
-    "",
-  );
+  let bytes: Uint8Array;
+  try {
+    bytes = driveFileId
+      ? await fetchGoogleDriveZipBytes(driveFileId, onStatus)
+      : await fetchDirectZipBytes(url, onStatus);
+  } catch (err) {
+    if (isDiscord && err instanceof Error && /HTTP (401|403|404)/.test(err.message)) {
+      throw new Error(
+        "Discord refused that link (it has probably expired or been deleted). " +
+          "Copy a fresh link to the attachment and try again.",
+      );
+    }
+    throw err;
+  }
+
+  let fallbackName = parsed.pathname.split("/").pop() || "Imported Pack";
+  try {
+    fallbackName = decodeURIComponent(fallbackName);
+  } catch {
+    /* keep raw name */
+  }
+  fallbackName = fallbackName.replace(/\.zip$/i, "") || "Imported Pack";
+
   onStatus?.("Unpacking…");
   // Blob's typings want a plain ArrayBuffer-backed BlobPart; slicing (rather
   // than passing bytes.buffer directly) is also correct if bytes is ever a
