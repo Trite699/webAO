@@ -4,6 +4,16 @@ import { formatObjectionField } from "../viewport/utils/customShouts";
 import { escapeChat } from "../encoding";
 import { sanitizeBlipName } from "../client/blipOverride";
 import { ensurePositionOption } from "../viewport/utils/positionOptions";
+import { splitByPoseTags } from "../viewport/utils/poseTagParser";
+import { getIcMessageCount } from "../viewport/utils/handleICSpeaking";
+import {
+  beginSegmentedSend,
+  endSegmentedSend,
+  isSegmentedSendActive,
+  setSegmentIndex,
+  sleep,
+  waitForOwnMessageDone,
+} from "../client/segmentedSend";
 
 /**
  * Triggered when the Return key is pressed on the in-character chat input box.
@@ -11,6 +21,8 @@ import { ensurePositionOption } from "../viewport/utils/positionOptions";
  */
 export function onEnter(event: KeyboardEvent) {
   if (event.keyCode === 13) {
+    // still sending the <pose:N> parts of the previous message
+    if (isSegmentedSendActive()) return false;
     const mychar = client.character;
     const myemo = client.emote;
     const evi = client.evidence + 1;
@@ -87,63 +99,102 @@ export function onEnter(event: KeyboardEvent) {
     const effect = (<HTMLInputElement>document.getElementById("effect_select"))
       .value;
 
-    let sfxname = "0";
-    let sfxdelay = 0;
-    let emote_mod = myemo.zoom;
-    if ((<HTMLInputElement>document.getElementById("sendsfx")).checked) {
-      const customSfx = (<HTMLInputElement>(
-        document.getElementById("sfx_override")
-      )).value.trim();
-      sfxname = customSfx || myemo.sfx;
-      // A custom sound has no char.ini-declared delay of its own; only use
-      // the pose's default delay when we're also using the pose's default
-      // sound, otherwise play it immediately.
-      sfxdelay = customSfx ? 0 : myemo.sfxdelay;
-    }
-
     // "Override blips…" box. Blank means the character's own blips.
     const blips = sanitizeBlipName(
       (<HTMLInputElement>document.getElementById("blip_override")).value,
     );
 
-    // not to overwrite a 5 from the ini or anything else
-    if ((<HTMLInputElement>document.getElementById("sendpreanim")).checked) {
-      if (emote_mod === 0) {
-        emote_mod = 1;
-      }
-    } else if (emote_mod === 1) {
-      emote_mod = 0;
-    }
+    // Split at <pose:N> tags: every part is sent as its own IC message with
+    // that pose's emote / preanim / sounds / frame effects (the later parts
+    // as "additive" so the text keeps flowing in the same chatbox). Because
+    // these are ordinary IC messages, every client sees them, patched or not.
+    let segments = splitByPoseTags(text, (n) => Boolean(client.emotes[n]));
+    if (segments.length === 0) segments = [{ text: "", pose: null }];
 
-    client.sender.sendIC(
-      myemo.deskmod,
-      myemo.preanim,
-      encodeRemoteName(mychar.name),
-      myemo.emote,
-      text,
-      myrole,
-      sfxname,
-      emote_mod,
-      sfxdelay,
-      formatObjectionField(selectedShout, selectedCustomShout),
-      evi,
-      flip,
-      flash,
-      color,
-      showname,
-      pairchar,
-      pairoffset,
-      pairyoffset,
-      noninterrupting_preanim,
-      looping_sfx,
-      screenshake,
-      myemo.frame_screenshake || "-",
-      myemo.frame_realization || "-",
-      myemo.frame_sfx || "-",
-      additive,
-      effect,
-      blips,
-    );
+    const sendSegment = (seg: { text: string; pose: number | null }, i: number) => {
+      const emo = seg.pose !== null ? client.emotes[seg.pose] : myemo;
+      const first = i === 0;
+
+      let sfxname = "0";
+      let sfxdelay = 0;
+      let emote_mod = emo.zoom;
+
+      if (seg.pose !== null) {
+        // a <pose:N> part always uses the pose's own sound and preanim
+        sfxname = emo.sfx || "0";
+        sfxdelay = emo.sfxdelay || 0;
+        const hasPreanim = Boolean(emo.preanim) && emo.preanim !== "-";
+        if (hasPreanim && emote_mod === 0) emote_mod = 1;
+        else if (!hasPreanim && emote_mod === 1) emote_mod = 0;
+      } else {
+        if ((<HTMLInputElement>document.getElementById("sendsfx")).checked) {
+          const customSfx = (<HTMLInputElement>(
+            document.getElementById("sfx_override")
+          )).value.trim();
+          sfxname = customSfx || emo.sfx;
+          // A custom sound has no char.ini-declared delay of its own; only use
+          // the pose's default delay when we're also using the pose's default
+          // sound, otherwise play it immediately.
+          sfxdelay = customSfx ? 0 : emo.sfxdelay;
+        }
+        // not to overwrite a 5 from the ini or anything else
+        if ((<HTMLInputElement>document.getElementById("sendpreanim")).checked) {
+          if (emote_mod === 0) emote_mod = 1;
+        } else if (emote_mod === 1) {
+          emote_mod = 0;
+        }
+      }
+
+      client.sender.sendIC(
+        emo.deskmod,
+        emo.preanim,
+        encodeRemoteName(mychar.name),
+        emo.emote,
+        seg.text,
+        myrole,
+        sfxname,
+        emote_mod,
+        sfxdelay,
+        first ? formatObjectionField(selectedShout, selectedCustomShout) : 0,
+        first ? evi : 0,
+        flip,
+        first ? flash : false,
+        color,
+        showname,
+        pairchar,
+        pairoffset,
+        pairyoffset,
+        noninterrupting_preanim,
+        looping_sfx,
+        first ? screenshake : false,
+        emo.frame_screenshake || "-",
+        emo.frame_realization || "-",
+        emo.frame_sfx || "-",
+        first ? additive : true,
+        first ? effect : "",
+        blips,
+      );
+    };
+
+    if (segments.length === 1) {
+      sendSegment(segments[0], 0);
+    } else {
+      (async () => {
+        beginSegmentedSend();
+        try {
+          for (let i = 0; i < segments.length; i += 1) {
+            setSegmentIndex(i);
+            const before = getIcMessageCount();
+            sendSegment(segments[i], i);
+            // let our own copy finish typing so the next part doesn't cut it off
+            await waitForOwnMessageDone(before);
+            if (i < segments.length - 1) await sleep(100);
+          }
+        } finally {
+          endSegmentedSend();
+        }
+      })();
+    }
   }
   return false;
 }
