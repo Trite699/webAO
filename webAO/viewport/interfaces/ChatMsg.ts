@@ -1,4 +1,6 @@
 import { PreloadedAssets } from "./PreloadedAssets";
+import { PoseChange } from "./PoseChange";
+import { PoseTag } from "../utils/poseTagParser";
 
 export interface ChatMsg {
   content: string;
@@ -37,4 +39,10 @@ export interface ChatMsg {
   noninterrupting_preanim?: number;
   preloadedAssets?: PreloadedAssets;
   charid?: number;
+  /** `<pose:N>` tags pulled out of the text, before they are resolved */
+  poseTags?: PoseTag[];
+  /** Resolved mid-text animation changes, in text order */
+  poseChanges?: PoseChange[];
+  /** Index of the next poseChanges entry still to fire */
+  poseIndex?: number;
 }
