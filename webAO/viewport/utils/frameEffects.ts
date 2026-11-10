@@ -144,12 +144,15 @@ function phaseEffects(chatmsg: any, phaseIdx: number): PhaseEffects {
   };
 }
 
-function playFrameSfx(name: string): void {
-  if (!name || name === "0" || name === "1") return;
+function playFrameSfx(rawName: string, charName?: string): void {
+  if (!rawName || rawName === "0" || rawName === "1") return;
   // Don't fire frame SFX while the tab is hidden; otherwise sounds queued up
   // around a visibility change can play on top of each other when the loop
   // resumes, which sounds like doubled effects.
   if (typeof document !== "undefined" && document.hidden) return;
+  // char.ini authors sometimes include the extension; sounds are looked up
+  // by bare name + extension.
+  const name = rawName.replace(/\.(opus|ogg|mp3|wav)$/i, "");
   const base = `${AO_HOST}sounds/general/${encodeURI(name.toLowerCase())}`;
   // Resolve through the locally-imported base assets first, the same way the
   // emote SFX path does (resolveAndPreloadAudio). Without this, a sound that
@@ -159,8 +162,9 @@ function playFrameSfx(name: string): void {
     const url = `${base}${ext}`;
     return resolveAssetUrl(url);
   };
-  // CDN character: use the sound from the speaker's CDN if it has one.
-  void probeRemoteSound(undefined, `${base}.opus`).then((cdn) => {
+  // CDN character: use the sound from the speaker's CDN if it has one
+  // (looked up by the message's speaker, not whoever spoke last).
+  void probeRemoteSound(charName, `${base}.opus`).then((cdn) => {
     const a = new Audio(cdn ?? sourceFor(".opus"));
     // Respect the SFX volume setting (the main SFX audio element holds it).
     const sfxAudio = document.getElementById("client_sfxaudio") as HTMLAudioElement | null;
@@ -277,7 +281,7 @@ export async function startFramePhase(
     const at = (frame: number) =>
       offsets[Math.min(frame, frameCount - 1)] ?? 0;
     for (const [frame, val] of phase.sfx) {
-      timers.push(window.setTimeout(() => playFrameSfx(val), at(frame)));
+      timers.push(window.setTimeout(() => playFrameSfx(val, chatmsg?.name), at(frame)));
     }
     for (const frame of phase.shake) {
       timers.push(window.setTimeout(doShake, at(frame)));
@@ -300,7 +304,7 @@ export async function startFramePhase(
   const fires: LoopFire[] = [];
   for (const [idx, val] of sfxByIdx) {
     const base = offsets[idx] ?? 0;
-    fires.push({ next: base, base, action: () => playFrameSfx(val) });
+    fires.push({ next: base, base, action: () => playFrameSfx(val, chatmsg?.name) });
   }
   for (const idx of shakeIdx) {
     const base = offsets[idx] ?? 0;
