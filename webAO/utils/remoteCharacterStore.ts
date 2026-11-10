@@ -1,7 +1,7 @@
 /**
  * "Remote" characters: characters that live on someone else's CDN / asset
- * server (e.g. https://mastyra.com/base/characters/Means/) and are streamed
- * from there on demand -- nothing is downloaded or stored beyond the link.
+ * server and are streamed.
+ * from there on demand nothing is downloaded or stored beyond the link.
  *
  * Unlike the zip-based local characters, a remote character CAN be shared:
  * when you speak as one, your client tags the character name with the CDN
@@ -187,6 +187,29 @@ export function listRemoteCharacters(): RemoteCharacter[] {
 
 export function getRemoteCharacter(name: string): RemoteCharacter | undefined {
   return remotes.get(name.toLowerCase());
+}
+
+/**
+ * CDN root (the folder that holds characters/, sounds/, misc/ ...) of a
+ * registered remote character, always ending in "/". null when the name isn't
+ * a remote character or its link isn't in the usual ".../characters/<Name>/"
+ * layout.
+ */
+export function getRemoteCdnRoot(name: string | undefined): string | null {
+  const rec = name ? remotes.get(name.toLowerCase()) : undefined;
+  if (!rec) return null;
+  const m = /^(.*\/)characters\/[^/]+\/$/i.exec(rec.base);
+  return m ? m[1] : null;
+}
+
+/**
+ * The misc folder of the CDN a remote character comes from
+ * (".../base/misc/"), or null for characters that aren't remote. Misc assets
+ * (shout bubbles / sounds, speedlines) are looked up there first.
+ */
+export function getRemoteMiscBase(name: string | undefined): string | null {
+  const root = getRemoteCdnRoot(name);
+  return root ? `${root}misc/` : null;
 }
 
 /**
