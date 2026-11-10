@@ -5,14 +5,70 @@ import {
 } from "./resolveLocalAsset";
 import { rememberRemotePath } from "./remoteCharacterStore";
 
-function headOk(target: string): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
+type HeadResult = "ok" | "missing" | "unknown";
+
+/** "unknown" = the request itself failed (network error / CORS-blocked). */
+function headOk(target: string): Promise<HeadResult> {
+  return new Promise<HeadResult>((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("HEAD", target);
-    xhr.onload = () => resolve(xhr.readyState === 4 && xhr.status === 200);
-    xhr.onerror = () => resolve(false);
+    xhr.onload = () =>
+      resolve(xhr.readyState === 4 && xhr.status === 200 ? "ok" : "missing");
+    xhr.onerror = () => resolve("unknown");
     xhr.send(null);
   });
+}
+
+const IMAGE_EXT = /\.(png|webp|gif|apng|jpe?g)$/i;
+const AUDIO_EXT = /\.(opus|ogg|mp3|wav)$/i;
+
+function isCrossOrigin(target: string): boolean {
+  try {
+    return new URL(target, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * CORS-free fallback for CDNs that don't send Access-Control-Allow-Origin:
+ * a HEAD to them fails, but an <img>/<audio> can still load the file.
+ */
+function loadsAsMedia(target: string, timeoutMs = 6000): Promise<boolean> {
+  const path = target.split(/[?#]/)[0];
+  const isImage = IMAGE_EXT.test(path);
+  const isAudio = AUDIO_EXT.test(path);
+  if (!isImage && !isAudio) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const el: HTMLImageElement | HTMLAudioElement = isImage
+      ? new Image()
+      : new Audio();
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      el.removeAttribute("src");
+      resolve(ok);
+    };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    el.addEventListener("error", () => done(false), { once: true });
+    if (isImage) {
+      el.addEventListener("load", () => done(true), { once: true });
+    } else {
+      (el as HTMLAudioElement).preload = "metadata";
+      el.addEventListener("loadedmetadata", () => done(true), { once: true });
+      el.addEventListener("canplay", () => done(true), { once: true });
+    }
+    el.src = target;
+  });
+}
+
+async function exists(target: string): Promise<boolean> {
+  const r = await headOk(target);
+  if (r === "ok") return true;
+  if (r === "unknown" && isCrossOrigin(target)) return loadsAsMedia(target);
+  return false;
 }
 
 const cache = new Map<string, Promise<boolean>>();
@@ -33,10 +89,10 @@ export default function fileExists(url: string): Promise<boolean> {
   }
 
   const promise = (async () => {
-    if (await headOk(getRemoteUrl(url) ?? url)) return true;
+    if (await exists(getRemoteUrl(url) ?? url)) return true;
     // Case-sensitive fix
     for (const v of getRemoteUrlVariants(url)) {
-      if (await headOk(v.url)) {
+      if (await exists(v.url)) {
         rememberRemotePath(v.name, v.path);
         return true;
       }
