@@ -22,14 +22,66 @@ export function setRemoteSpeaker(name: string | undefined): void {
 const resolved = new Map<string, string | null>();
 const pending = new Map<string, Promise<string | null>>();
 
-function head(url: string): Promise<boolean> {
+type Probe = "yes" | "no" | "unknown";
+
+/**
+ * HEAD request. "unknown" means the request itself failed (typically a CDN
+ * that doesn't send Access-Control-Allow-Origin, where the browser hides the
+ * answer even though plain <audio>/<img> loading would work).
+ */
+function head(url: string): Promise<Probe> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("HEAD", url);
-    xhr.onload = () => resolve(xhr.status === 200);
-    xhr.onerror = () => resolve(false);
+    xhr.onload = () => resolve(xhr.status === 200 ? "yes" : "no");
+    xhr.onerror = () => resolve("unknown");
     xhr.send(null);
   });
+}
+
+/** CORS-free existence check: does an <audio> element manage to load it? */
+function audioLoads(url: string, timeoutMs = 4000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const a = new Audio();
+    let settled = false;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      a.removeAttribute("src");
+      a.load();
+      resolve(ok);
+    };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    a.preload = "metadata";
+    a.addEventListener("loadedmetadata", () => done(true), { once: true });
+    a.addEventListener("canplay", () => done(true), { once: true });
+    a.addEventListener("error", () => done(false), { once: true });
+    a.src = url;
+  });
+}
+
+/**
+ * First URL (list order = priority) that exists. HEAD is tried on all of
+ * them at once; URLs whose HEAD was blocked are re-checked by actually
+ * loading them, a few at a time, but only the ones that outrank the first
+ * confirmed hit.
+ */
+async function firstExisting(urls: string[]): Promise<string | null> {
+  const heads = await Promise.all(urls.map(head));
+  const firstYes = heads.indexOf("yes");
+  const limit = firstYes === -1 ? urls.length : firstYes;
+  const unknown: number[] = [];
+  for (let i = 0; i < limit; i += 1) if (heads[i] === "unknown") unknown.push(i);
+  const CHUNK = 6;
+  for (let i = 0; i < unknown.length; i += CHUNK) {
+    const chunk = unknown.slice(i, i + CHUNK);
+    // eslint-disable-next-line no-await-in-loop
+    const oks = await Promise.all(chunk.map((idx) => audioLoads(urls[idx])));
+    const hit = chunk.find((_, k) => oks[k]);
+    if (hit !== undefined) return urls[hit];
+  }
+  return firstYes === -1 ? null : urls[firstYes];
 }
 
 const enc = (path: string) => path.split("/").map(encodeURIComponent).join("/");
@@ -82,8 +134,8 @@ export function probeRemoteSound(
   if (inflight) return inflight;
 
   const urls = candidateUrls(rec.base, parsed.rel);
-  const p = Promise.all(urls.map(head)).then((oks) => {
-    const hit = urls.find((_, i) => oks[i]) ?? null; // earliest = highest priority
+  const p = firstExisting(urls).then((hit) => {
+    // earliest = highest priority
     resolved.set(key, hit);
     pending.delete(key);
     return hit;
