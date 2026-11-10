@@ -8,6 +8,10 @@ import {
 } from "../../utils/assetCache";
 import resolveEmotePrefix from "../../utils/resolveEmotePrefix";
 import transparentPng from "../../constants/transparentPng";
+import {
+  deriveRemoteFrameEffects,
+  warmRemoteFrameSfx,
+} from "./remoteFrameEffects";
 
 const GLOBAL_TIMEOUT_MS = 8000;
 
@@ -68,6 +72,11 @@ export default async function preloadMessageAssets(
   const charEmote = chatmsg.sprite!.toLowerCase();
 
   const doPreload = async (): Promise<PreloadedAssets> => {
+    // CDN character with no frame data in the message: read it from the
+    // character's char.ini on the CDN, then warm the frame SFX lookups.
+    await deriveRemoteFrameEffects(chatmsg);
+    warmRemoteFrameSfx(chatmsg);
+
     // Build candidate URL lists for each emote
     const idleUrls = buildEmoteUrls(AO_HOST, emoteExtensions, charName, charEmote, "(a)");
     const talkingUrls = buildEmoteUrls(AO_HOST, emoteExtensions, charName, charEmote, "(b)");
