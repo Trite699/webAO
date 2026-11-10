@@ -8,6 +8,7 @@ import { getBackgroundDesignIni, listDesignIniPositions } from "../utils/backgro
 import { ensurePositionOption } from "./positionOptions";
 import { resolveAndPreloadImage } from "../../utils/assetCache";
 import { buildSpeedlineCandidates, resolveMiscFolder } from "./miscAssets";
+import { getRemoteMiscBase } from "../../utils/remoteCharacterStore";
 
 // A list of ALL extensions to check locally, since webAO defaults often miss webp/jpg
 const ALL_EXTS = [".png", ".webp", ".jpg", ".jpeg", ".gif"];
@@ -220,6 +221,7 @@ export const set_side = async ({
           AO_HOST,
           resolveMiscFolder(client.viewport.getChatmsg()),
           speedLines,
+          getRemoteMiscBase(client.viewport.getChatmsg().name),
         ),
       );
       if (found && found !== transparentPng) resolvedSpeedlines = found;
