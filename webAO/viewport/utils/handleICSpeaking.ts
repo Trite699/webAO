@@ -15,6 +15,7 @@ import {
   buildShoutBubbleCandidates,
   getOverrideShouts,
   resolveMiscFolder,
+  cdnMiscBases,
 } from "./miscAssets";
 import { setChatbox } from "../../dom/setChatbox";
 import { resizeChatbox } from "../../dom/resizeChatbox";
@@ -26,6 +27,7 @@ import preloadMessageAssets from "./preloadMessageAssets";
 import { resolvePoseChanges } from "./poseTags";
 import { resolveAndPreloadImage, resolveAndPreloadAudio } from "../../utils/assetCache";
 import { stopFrameEffects, primeFrameOffsets } from "./frameEffects";
+import { getRemoteMiscBase } from "../../utils/remoteCharacterStore";
 import { getAnimFrameOffsets } from "../../utils/getAnimFrameOffsets";
 import { ensureCharIni } from "../../client/handleCharacterInfo";
 import fileExists from "../../utils/fileExists";
@@ -672,6 +674,7 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
       resolveMiscFolder(bubbleMsg),
       shout,
       getOverrideShouts(),
+      getRemoteMiscBase(bubbleMsg.name),
     );
     shoutSprite.src = await resolveAndPreloadImage(bubbleCandidates);
     shoutSprite.style.animation = "bubble 700ms steps(10, jump-both)";
@@ -722,11 +725,19 @@ export const handle_ic_speaking = async (playerChatMsg: ChatMsg) => {
       : [];
     const miscChat = resolveMiscFolder(client.viewport.getChatmsg());
     const shoutCharName = (client.viewport.getChatmsg().name || "").toLowerCase();
+    // CDN character: that CDN's misc folder comes before the player's own.
+    const cdnShoutMisc = cdnMiscBases(
+      getRemoteMiscBase(shoutCharName),
+      miscChat,
+      shout,
+    );
     const sfxBases = [
       ...customSfxBases,
       `${AO_HOST}characters/${encodeURI(shoutCharName)}/${shout}`,
+      ...cdnShoutMisc.chat,
       `${AO_HOST}misc/${encodeURI(miscChat)}/${shout}`,
       `${AO_HOST}themes/default/${shout}`,
+      ...cdnShoutMisc.fallback,
       `${AO_HOST}misc/default/${shout}`,
       `${AO_HOST}sounds/general/sfx-${shout}`,
     ].filter((b): b is string => !!b);
